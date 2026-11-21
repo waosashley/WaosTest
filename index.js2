@@ -1,0 +1,604 @@
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  downloadContentFromMessage,
+} = require('@whiskeysockets/baileys');
+const qrcode = require('qrcode-terminal');
+const pino = require('pino');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+// ---------- Persistencia ----------
+const DATA_DIR = path.join(__dirname, 'data');
+const STICKERS_DIR = path.join(DATA_DIR, 'stickers');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+if (!fs.existsSync(STICKERS_DIR)) fs.mkdirSync(STICKERS_DIR);
+
+function loadJSON(file, fallback) {
+  const fp = path.join(DATA_DIR, file);
+  if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf8'));
+  return fallback;
+}
+function saveJSON(file, data) {
+  fs.writeFileSync(path.join(DATA_DIR, file), JSON.stringify(data, null, 2));
+}
+
+let warns = loadJSON('warns.json', {});
+let bannedWords = loadJSON('bannedWords.json', {});
+let bannedStickers = loadJSON('bannedStickers.json', {});
+let stickerCommands = loadJSON('stickerCommands.json', {});
+let mutedUsers = loadJSON('mutedUsers.json', {});
+
+// ---------- Utilidades ----------
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const activeGames = new Map(); // groupJid -> gameState
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function normalizeText(str) {
+  return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function userNum(jid) {
+  if (!jid) return '';
+  return String(jid).split(':')[0].split('@')[0];
+}
+
+async function isSenderAdmin(sock, groupJid, userJid) {
+  const meta = await sock.groupMetadata(groupJid);
+  const num = userNum(userJid);
+  const p = meta.participants.find(
+    p => userNum(p.id) === num || userNum(p.lid) === num
+  );
+  if (!p) return false;
+  return p.admin === 'admin' || p.admin === 'superadmin';
+}
+
+function getSenderJid(msg) {
+  return msg.key.participant || msg.key.remoteJid;
+}
+function getMentionedJid(msg) {
+  return msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || null;
+}
+function hashToHex(u8) {
+  return Buffer.from(u8).toString('hex');
+}
+function sha256Hex(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+async function downloadStickerBuffer(sticker) {
+  const stream = await downloadContentFromMessage(sticker, 'sticker');
+  let buffer = Buffer.from([]);
+  for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+  return buffer;
+}
+
+// ---------- Ruleta rusa ----------
+async function runRussianRoulette(sock, groupJid, game) {
+  const players = shuffle(game.players);
+  const loserIndex = Math.floor(Math.random() * players.length);
+  const loser = players[loserIndex];
+
+  await sock.sendMessage(groupJid, {
+    text: `🔫 *Ruleta rusa*\n\nJugadores: ${players.map(p => '@' + p.split('@')[0]).join(', ')}\n\nEl bot irá señalando a cada uno en orden...`,
+    mentions: players,
+  });
+
+  await sleep(2000);
+
+  for (let i = 0; i < players.length; i++) {
+    if (game.stopped) return;
+    const player = players[i];
+    if (i === loserIndex) {
+      await sock.sendMessage(groupJid, {
+        text: `💥 @${player.split('@')[0]} jaló el gatillo... *BANG*\n\n${game.isFake ? '(Modo fake: no se expulsa a nadie)' : 'Ha perdido. Adiós.'}`,
+        mentions: [player],
+      });
+      if (!game.isFake) {
+        try { await sock.groupParticipantsUpdate(groupJid, [player], 'remove'); }
+        catch (e) { console.error('[RULETA KICK]', e.message); }
+      }
+      break;
+    } else {
+      await sock.sendMessage(groupJid, {
+        text: `😅 @${player.split('@')[0]} jaló el gatillo... click. Sobrevive.`,
+        mentions: [player],
+      });
+      await sleep(1500);
+    }
+  }
+
+  activeGames.delete(groupJid);
+}
+
+function createRouletteGame(sock, groupJid, creatorJid, isFake) {
+  if (activeGames.has(groupJid)) return false;
+  const game = {
+    creator: creatorJid,
+    players: [creatorJid],
+    started: false,
+    stopped: false,
+    isFake,
+    timeout: null,
+  };
+  game.timeout = setTimeout(() => {
+    const g = activeGames.get(groupJid);
+    if (g && !g.started) {
+      activeGames.delete(groupJid);
+      sock.sendMessage(groupJid, { text: '⏱️ Se acabó el tiempo para unirse. La ruleta se canceló.' }).catch(() => {});
+    }
+  }, 60000);
+  activeGames.set(groupJid, game);
+  return true;
+}
+
+// ---------- Arranque ----------
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth_session');
+  const { version } = await fetchLatestBaileysVersion();
+
+  const sock = makeWASocket({
+    version,
+    auth: state,
+    printQRInTerminal: false,
+    logger: pino({ level: 'silent' }),
+    browser: ['BotAdmin', 'Chrome', '1.0.0'],
+  });
+
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect, qr } = update;
+    if (qr) {
+      console.log('\n📲 Escanea este QR desde WhatsApp > Dispositivos vinculados:\n');
+      qrcode.generate(qr, { small: true });
+    }
+    if (connection === 'open') console.log('✅ Bot conectado como', sock.user?.id);
+    if (connection === 'close') {
+      const shouldReconnect =
+        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      if (shouldReconnect) startBot();
+      else console.log('❌ Sesión cerrada.');
+    }
+  });
+
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    const msg = messages[0];
+    if (!msg.message || msg.key.fromMe) return;
+
+    const groupJid = msg.key.remoteJid;
+    if (!groupJid.endsWith('@g.us')) return;
+
+    const senderJid = getSenderJid(msg);
+    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+
+    // ---------- FILTRO DE USUARIOS MUTEADOS ----------
+    if (mutedUsers[`${groupJid}:${senderJid}`]) {
+      try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
+      return;
+    }
+
+    // ---------- STICKER ----------
+    let commandText = null;
+    let mentionOverride = null;
+
+    if (msg.message.stickerMessage?.fileSha256) {
+      const fileSha = hashToHex(msg.message.stickerMessage.fileSha256);
+      const ctx = msg.message.stickerMessage?.contextInfo;
+      console.log('[STICKER] fileSha:', fileSha.slice(0, 12), '| esRespuesta:', !!ctx?.quotedMessage, '| registrados:', Object.keys(stickerCommands).length);
+
+      if (bannedStickers[fileSha]) {
+        try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
+        return;
+      }
+
+      let entry = stickerCommands[fileSha] || null;
+
+      if (!entry && ctx?.quotedMessage) {
+        try {
+          const buffer = await downloadStickerBuffer(msg.message.stickerMessage);
+          const contentHash = sha256Hex(buffer);
+          if (stickerCommands[contentHash]) entry = stickerCommands[contentHash];
+          if (bannedStickers[contentHash]) {
+            try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
+            return;
+          }
+        } catch (e) {}
+      }
+
+      if (entry) {
+        commandText = entry.cmd;
+        if (ctx?.participant) mentionOverride = ctx.participant;
+      }
+    }
+
+    // ---------- FILTRO DE PALABRAS PROHIBIDAS ----------
+    if (text) {
+      const wordKey = `${groupJid}:${senderJid}`;
+      const userBanned = bannedWords[wordKey] || [];
+      if (userBanned.length > 0) {
+        const normalizedText = normalizeText(text);
+        const found = userBanned.find(w => normalizedText.includes(normalizeText(w)));
+        if (found) {
+          try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
+          return;
+        }
+      }
+    }
+
+    // ---------- Detectar comando ----------
+    if (!commandText && (text.startsWith('!') || text.startsWith('.'))) {
+      commandText = text;
+    }
+    if (!commandText) return;
+
+    // ---------- Solo admins ----------
+    const isAdmin = await isSenderAdmin(sock, groupJid, senderJid);
+    if (!isAdmin) return;
+
+    const command = commandText.slice(1).split(' ')[0].toLowerCase();
+    const getArgs = () => commandText.slice(1).split(' ').slice(1);
+    const getTarget = () => {
+      if (mentionOverride) return mentionOverride;
+      const mentioned = getMentionedJid(msg);
+      if (mentioned) return mentioned;
+      const ctx = msg.message?.extendedTextMessage?.contextInfo || msg.message?.stickerMessage?.contextInfo;
+      return ctx?.participant || null;
+    };
+
+    // --- !menu ---
+    if (command === 'menu') {
+      const menu =
+`ASHP̸̪̪̫͌͘̕P̴̡͙̘͋͝I̸͚̪͙̐̓̽E̴͕͙̻͊͐͝_BOT_V1.3
+
+*Comandos*
+
+!mute — cierra el grupo
+!mute @usuario — silencia a un usuario (borra sus mensajes)
+!unmute — abre el grupo
+!unmute @usuario — desilencia a un usuario
+!kick @usuario — saca a alguien
+!warn @usuario — da una advertencia (3 y se va)
+!banword @usuario palabras — prohíbe palabras (sin tildes ni mayúsculas)
+!unbanword @usuario — quita las palabras prohibidas
+!bansticker (responder al sticker) — prohíbe un sticker
+!unbansticker (responder al sticker) — lo quita de la lista
+!stickersbans — stickers prohibidos
+!listbanwords — palabras prohibidas
+!addcmd !comando (responder al sticker) — registra un sticker como comando
+!delcmd (responder al sticker) — elimina el comando del sticker
+!listcmd — comandos de sticker registrados
+!ruletarusa create — crea ruleta rusa (máx 4, el perdedor es expulsado)
+!ruletarusa unirme — únete (60s para unirse)
+!ruletarusa iniciar — el creador inicia el juego
+!ruleta stop — cancela la ruleta pendiente
+!ruletafake — ruleta sin expulsar a nadie
+!menu — esta lista`;
+      return sock.sendMessage(groupJid, { text: menu }, { quoted: msg });
+    }
+
+    // --- !stickersbans ---
+    if (command === 'stickersbans') {
+      const hashes = Object.keys(bannedStickers);
+      if (hashes.length === 0) return sock.sendMessage(groupJid, { text: 'No hay stickers baneados.' }, { quoted: msg });
+      await sock.sendMessage(groupJid, { text: `Stickers baneados: ${hashes.length}` }, { quoted: msg });
+      for (const hash of hashes) {
+        const fp = path.join(STICKERS_DIR, `${hash}.webp`);
+        if (fs.existsSync(fp)) {
+          try { await sock.sendMessage(groupJid, { sticker: fs.readFileSync(fp) }); } catch (e) {}
+        }
+      }
+      return;
+    }
+
+    // --- !listbanwords ---
+    if (command === 'listbanwords') {
+      const entries = Object.entries(bannedWords).filter(([k]) => k.startsWith(groupJid + ':'));
+      if (entries.length === 0) return sock.sendMessage(groupJid, { text: 'No hay palabras prohibidas en este grupo.' }, { quoted: msg });
+      const mentions = entries.map(([k]) => k.split(':')[1]);
+      const lines = entries.map(([k, words]) => `@${k.split(':')[1].split('@')[0]}: ${words.join(', ')}`);
+      return sock.sendMessage(groupJid, { text: `*Palabras prohibidas*\n\n${lines.join('\n')}`, mentions }, { quoted: msg });
+    }
+
+    // --- !addcmd ---
+    if (command === 'addcmd') {
+      const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      if (!quoted?.stickerMessage?.fileSha256) {
+        return sock.sendMessage(groupJid, { text: 'Uso: responde a un sticker con !addcmd !comando' }, { quoted: msg });
+      }
+      const cmdArg = getArgs()[0];
+      if (!cmdArg) return sock.sendMessage(groupJid, { text: 'Falta el comando. Uso: !addcmd !comando' }, { quoted: msg });
+      const registered = (cmdArg.startsWith('!') || cmdArg.startsWith('.')) ? cmdArg : '!' + cmdArg;
+      const sticker = quoted.stickerMessage;
+      const fileSha = hashToHex(sticker.fileSha256);
+
+      let contentHash = null;
+      try {
+        const buffer = await downloadStickerBuffer(sticker);
+        contentHash = sha256Hex(buffer);
+        fs.writeFileSync(path.join(STICKERS_DIR, `${contentHash}.webp`), buffer);
+      } catch (e) {
+        console.error('[ADDCMD] descarga falló:', e.message);
+      }
+
+      const entry = { cmd: registered, fileSha, contentHash };
+      stickerCommands[fileSha] = entry;
+      if (contentHash) stickerCommands[contentHash] = entry;
+      saveJSON('stickerCommands.json', stickerCommands);
+      return sock.sendMessage(groupJid, { text: `✅ Sticker registrado como ${registered}` }, { quoted: msg });
+    }
+
+    // --- !delcmd ---
+    if (command === 'delcmd') {
+      const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      if (!quoted?.stickerMessage?.fileSha256) return sock.sendMessage(groupJid, { text: 'Uso: responde al sticker con !delcmd' }, { quoted: msg });
+      const fileSha = hashToHex(quoted.stickerMessage.fileSha256);
+      let entry = stickerCommands[fileSha];
+      if (!entry) {
+        try {
+          const buffer = await downloadStickerBuffer(quoted.stickerMessage);
+          const contentHash = sha256Hex(buffer);
+          entry = stickerCommands[contentHash];
+        } catch (e) {}
+      }
+      if (!entry) return sock.sendMessage(groupJid, { text: 'Ese sticker no tiene comando asignado.' }, { quoted: msg });
+
+      const removed = entry.cmd;
+      if (entry.fileSha) delete stickerCommands[entry.fileSha];
+      if (entry.contentHash) delete stickerCommands[entry.contentHash];
+      saveJSON('stickerCommands.json', stickerCommands);
+
+      if (entry.contentHash) {
+        const fp = path.join(STICKERS_DIR, `${entry.contentHash}.webp`);
+        if (fs.existsSync(fp) && !bannedStickers[entry.contentHash]) fs.unlinkSync(fp);
+      }
+      return sock.sendMessage(groupJid, { text: `✅ Comando ${removed} eliminado.` }, { quoted: msg });
+    }
+
+    // --- !listcmd ---
+    if (command === 'listcmd') {
+      const seen = new Set();
+      const unique = [];
+      for (const entry of Object.values(stickerCommands)) {
+        if (seen.has(entry)) continue;
+        seen.add(entry);
+        unique.push(entry);
+      }
+      if (unique.length === 0) return sock.sendMessage(groupJid, { text: 'No hay comandos de sticker registrados.' }, { quoted: msg });
+      await sock.sendMessage(groupJid, { text: `Comandos de sticker: ${unique.length}` }, { quoted: msg });
+      for (const entry of unique) {
+        const fp = entry.contentHash ? path.join(STICKERS_DIR, `${entry.contentHash}.webp`) : null;
+        if (fp && fs.existsSync(fp)) {
+          try {
+            await sock.sendMessage(groupJid, { sticker: fs.readFileSync(fp) });
+            await sock.sendMessage(groupJid, { text: `→ ${entry.cmd}` });
+          } catch (e) {}
+        } else {
+          await sock.sendMessage(groupJid, { text: `(${(entry.fileSha || '').slice(0, 8)}...) → ${entry.cmd}` });
+        }
+      }
+      return;
+    }
+
+    // --- !bansticker ---
+    if (command === 'bansticker') {
+      const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      if (!quoted?.stickerMessage?.fileSha256) return;
+      const sticker = quoted.stickerMessage;
+      const fileSha = hashToHex(sticker.fileSha256);
+      let contentHash = null;
+      try {
+        const buffer = await downloadStickerBuffer(sticker);
+        contentHash = sha256Hex(buffer);
+        fs.writeFileSync(path.join(STICKERS_DIR, `${contentHash}.webp`), buffer);
+      } catch (e) {}
+      const entry = stickerCommands[fileSha];
+      if (entry) {
+        if (entry.fileSha) delete stickerCommands[entry.fileSha];
+        if (entry.contentHash) delete stickerCommands[entry.contentHash];
+        saveJSON('stickerCommands.json', stickerCommands);
+      }
+      bannedStickers[fileSha] = true;
+      if (contentHash) bannedStickers[contentHash] = true;
+      saveJSON('bannedStickers.json', bannedStickers);
+      return;
+    }
+
+    // --- !unbansticker ---
+    if (command === 'unbansticker') {
+      const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      if (!quoted?.stickerMessage?.fileSha256) return;
+      const fileSha = hashToHex(quoted.stickerMessage.fileSha256);
+      delete bannedStickers[fileSha];
+      try {
+        const buffer = await downloadStickerBuffer(quoted.stickerMessage);
+        const contentHash = sha256Hex(buffer);
+        delete bannedStickers[contentHash];
+      } catch (e) {}
+      saveJSON('bannedStickers.json', bannedStickers);
+      return;
+    }
+
+    // --- !mute (grupo o usuario) ---
+    if (command === 'mute') {
+      const target = getTarget();
+      if (target) {
+        if (target === senderJid) return;
+        const targetIsAdmin = await isSenderAdmin(sock, groupJid, target);
+        if (targetIsAdmin) {
+          return sock.sendMessage(groupJid, { text: 'No puedo mutear a un administrador.' }, { quoted: msg });
+        }
+        mutedUsers[`${groupJid}:${target}`] = true;
+        saveJSON('mutedUsers.json', mutedUsers);
+        return sock.sendMessage(groupJid, {
+          text: `🔇 @${target.split('@')[0]} silenciado. Sus mensajes serán borrados hasta que un admin use !unmute.`,
+          mentions: [target],
+        }, { quoted: msg });
+      }
+      try { await sock.groupSettingUpdate(groupJid, 'announcement'); }
+      catch (e) { console.error('[MUTE] ERROR:', e.message); }
+      return;
+    }
+
+    // --- !unmute (grupo o usuario) ---
+    if (command === 'unmute') {
+      const target = getTarget();
+      if (target) {
+        const key = `${groupJid}:${target}`;
+        if (!mutedUsers[key]) return;
+        delete mutedUsers[key];
+        saveJSON('mutedUsers.json', mutedUsers);
+        return sock.sendMessage(groupJid, {
+          text: `🔊 @${target.split('@')[0]} desilenciado.`,
+          mentions: [target],
+        }, { quoted: msg });
+      }
+      try { await sock.groupSettingUpdate(groupJid, 'not_announcement'); }
+      catch (e) { console.error('[UNMUTE] ERROR:', e.message); }
+      return;
+    }
+
+    // --- !kick ---
+    if (command === 'kick') {
+      const target = getTarget();
+      if (!target || target === senderJid) return;
+      try {
+        const result = await sock.groupParticipantsUpdate(groupJid, [target], 'remove');
+        console.log('[KICK] OK:', JSON.stringify(result));
+      } catch (e) {
+        console.error('[KICK] ERROR:', e.message);
+      }
+      return;
+    }
+
+    // --- !warn ---
+    if (command === 'warn') {
+      const target = getTarget();
+      if (!target || target === senderJid) return;
+      const warnKey = `${groupJid}:${target}`;
+      const current = (warns[warnKey] || 0) + 1;
+      warns[warnKey] = current;
+      saveJSON('warns.json', warns);
+      if (current >= 3) {
+        try {
+          await sock.groupParticipantsUpdate(groupJid, [target], 'remove');
+          delete warns[warnKey];
+          saveJSON('warns.json', warns);
+        } catch (e) { console.error('[WARN→KICK]', e.message); }
+      }
+      return;
+    }
+
+    // --- !banword ---
+    if (command === 'banword') {
+      const target = getTarget();
+      if (!target) return;
+      const args = getArgs();
+      let wordsPart = '';
+      if (args.length > 0) {
+        const mentionText = '@' + target.split('@')[0];
+        wordsPart = args.join(' ').replace(mentionText, '').trim();
+      }
+      if (!wordsPart) return;
+      const palabras = wordsPart.split(',').map(p => p.trim()).filter(Boolean);
+      if (palabras.length === 0) return;
+      const bwKey = `${groupJid}:${target}`;
+      bannedWords[bwKey] = [...new Set([...(bannedWords[bwKey] || []), ...palabras])];
+      saveJSON('bannedWords.json', bannedWords);
+      return;
+    }
+
+    // --- !unbanword ---
+    if (command === 'unbanword') {
+      const target = getTarget();
+      if (!target) return;
+      const bwKey = `${groupJid}:${target}`;
+      delete bannedWords[bwKey];
+      saveJSON('bannedWords.json', bannedWords);
+      return;
+    }
+
+    // --- !ruletarusa <sub> ---
+    if (command === 'ruletarusa') {
+      const sub = getArgs()[0]?.toLowerCase();
+
+      if (sub === 'create') {
+        if (activeGames.has(groupJid)) {
+          return sock.sendMessage(groupJid, { text: 'Ya hay una ruleta activa en este grupo.' }, { quoted: msg });
+        }
+        const ok = createRouletteGame(sock, groupJid, senderJid, false);
+        if (!ok) return;
+        return sock.sendMessage(groupJid, {
+          text: `🔫 *Ruleta rusa creada*\n\nCreador: @${senderJid.split('@')[0]}\nTienen 60 segundos para unirse con *!ruletarusa unirme*.\nMáximo 4 jugadores. El perdedor será expulsado.\n\nEl creador inicia con *!ruletarusa iniciar*.`,
+          mentions: [senderJid],
+        }, { quoted: msg });
+      }
+
+      if (sub === 'unirme') {
+        const game = activeGames.get(groupJid);
+        if (!game || game.started) return sock.sendMessage(groupJid, { text: 'No hay una ruleta abierta.' }, { quoted: msg });
+        if (game.players.includes(senderJid)) return sock.sendMessage(groupJid, { text: 'Ya estás dentro.' }, { quoted: msg });
+        if (game.players.length >= 4) return sock.sendMessage(groupJid, { text: 'La ruleta está llena (máx 4).' }, { quoted: msg });
+        game.players.push(senderJid);
+        return sock.sendMessage(groupJid, {
+          text: `✅ @${senderJid.split('@')[0]} se unió.\nJugadores (${game.players.length}/4): ${game.players.map(p => '@' + p.split('@')[0]).join(', ')}`,
+          mentions: game.players,
+        }, { quoted: msg });
+      }
+
+      if (sub === 'iniciar') {
+        const game = activeGames.get(groupJid);
+        if (!game) return sock.sendMessage(groupJid, { text: 'No hay ruleta activa.' }, { quoted: msg });
+        if (game.started) return;
+        if (game.creator !== senderJid) return sock.sendMessage(groupJid, { text: 'Solo el creador puede iniciar.' }, { quoted: msg });
+        if (game.players.length < 2) return sock.sendMessage(groupJid, { text: 'Necesitan al menos 2 jugadores.' }, { quoted: msg });
+        game.started = true;
+        if (game.timeout) clearTimeout(game.timeout);
+        await runRussianRoulette(sock, groupJid, game);
+        return;
+      }
+
+      return;
+    }
+
+    // --- !ruleta stop ---
+    if (command === 'ruleta') {
+      const sub = getArgs()[0]?.toLowerCase();
+      if (sub === 'stop') {
+        const game = activeGames.get(groupJid);
+        if (!game) return sock.sendMessage(groupJid, { text: 'No hay ruleta activa.' }, { quoted: msg });
+        if (game.creator !== senderJid && !isAdmin) return;
+        game.stopped = true;
+        if (game.timeout) clearTimeout(game.timeout);
+        activeGames.delete(groupJid);
+        return sock.sendMessage(groupJid, { text: '🛑 Ruleta detenida.' }, { quoted: msg });
+      }
+      return;
+    }
+
+    // --- !ruletafake ---
+    if (command === 'ruletafake') {
+      if (activeGames.has(groupJid)) {
+        return sock.sendMessage(groupJid, { text: 'Ya hay una ruleta activa en este grupo.' }, { quoted: msg });
+      }
+      createRouletteGame(sock, groupJid, senderJid, true);
+      return sock.sendMessage(groupJid, {
+        text: `🎭 *Ruleta fake creada*\n\nCreador: @${senderJid.split('@')[0]}\nTienen 60 segundos para unirse con *!ruletarusa unirme*.\nMáximo 4 jugadores. *Nadie será expulsado.*\n\nEl creador inicia con *!ruletarusa iniciar*.`,
+        mentions: [senderJid],
+      }, { quoted: msg });
+    }
+  });
+}
+
+startBot().catch(e => console.error('Error fatal:', e));
