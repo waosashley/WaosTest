@@ -33,5 +33,6 @@ module.exports = {
 !conecta4 unirme — segundo jugador se une
 !conecta4 iniciar — creador inicia
 !conecta4 stop — cancela
+!sa (resp. sticker) + !sa (resp. audio) — sticker con audio
 !menu — esta lista` }),
 };
