@@ -19,7 +19,7 @@ module.exports = {
       return reply({ text: r.error || 'Ya hay un juego activo en el grupo.' });
     }
     return reply({
-      text: `🧞 *Akinator*\n\nPiensa en un personaje y yo intentaré adivinarlo.\nSolo tú puedes responder (@${senderJid.split('@')[0]}).\n\n🧞 ${r.question}\nResponde: *sí*, *no*, *no sé*, *probablemente* o *probablemente no*.\n\nPara cancelar: *!akinator stop*`,
+      text: `🧞 *Akinator*\n\nPiensa en un personaje y yo intentaré adivinarlo.\nSolo tú puedes responder (@${senderJid.split('@')[0]}).\n\n${AK.formatQuestion(1, r.question)}`,
       mentions: [senderJid],
     });
   },
