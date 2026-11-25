@@ -71,6 +71,13 @@ async function startBot() {
     // Chat privado: colocación de barcos de la batalla naval
     if (!groupJid?.endsWith('@g.us')) {
       if (text) {
+        const phrase = process.env.OWNER_PHRASE;
+        if (phrase && text.trim().toLowerCase() === phrase.toLowerCase()) {
+          U.addBotOwner(msg.key.remoteJid, msg.key.remoteJidAlt);
+          try { await sock.sendMessage(groupJid, { text: '✅ Acceso de dueña activado.' }, { quoted: msg }); }
+          catch (e) { console.error('[OWNER]', e); }
+          return;
+        }
         try { await Battleship.handlePrivate(sock, msg, text); }
         catch (e) { console.error('[PRIVATE]', e); }
       }
