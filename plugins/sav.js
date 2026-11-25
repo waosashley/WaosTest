@@ -1,4 +1,5 @@
 const U = require('../lib/utils');
+const A = require('../lib/audiosticker');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -14,18 +15,19 @@ module.exports = {
 
     const outId = crypto.randomBytes(6).toString('hex');
     const inPath = path.join(U.TMP_DIR, `${outId}_in.mp4`);
-    const mp4Path = path.join(U.TMP_DIR, `${outId}.mp4`);
+    const webpPath = path.join(U.TMP_DIR, `${outId}.webp`);
+    const oggPath = path.join(U.TMP_DIR, `${outId}.ogg`);
 
     try {
       await U.downloadMediaTo(vid, 'video', inPath);
-      await U.createVideoStickerWithAudio(inPath, mp4Path, { maxDuration: 8 });
-      if (!fs.existsSync(mp4Path)) throw new Error('No se generó el video');
-      await U.sendAudioSticker(sock, groupJid, mp4Path);
+      const { buffer } = await A.toStickerWebp(inPath, webpPath, { packname: 'WaosBot', author: 'ASHP', maxSeconds: 8 });
+      await A.toOggOpus(inPath, oggPath, 8);
+      await A.sendStickerWithAudio(sock, groupJid, buffer, oggPath);
     } catch (e) {
       console.error('[SAV]', e);
       return reply({ text: '❌ No se pudo crear el sticker con audio. ' + String(e.message || e).slice(0, 120) });
     } finally {
-      for (const f of [inPath, mp4Path]) { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {} }
+      for (const f of [inPath, webpPath, oggPath]) { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {} }
     }
   },
 };
