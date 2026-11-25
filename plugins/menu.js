@@ -21,8 +21,6 @@ const categories = [
     ['!addcmd !comando', 'Responde a un sticker para registrarlo'],
     ['!delcmd', 'Responde a un sticker para eliminarlo'],
     ['!listcmd', 'Comandos registrados'],
-    ['!sa', 'Sticker + audio (responde a cada uno con !sa)'],
-    ['!sav', 'Responde a un video para convertirlo en sticker con su audio'],
     ['!modvoice aguda/grave N', 'Responde a un audio; cambia el tono (1-12) y lo envía como nota de voz'],
   ] },
   { title: '⚙️ Solo creadora', rows: [
