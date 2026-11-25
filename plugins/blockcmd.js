@@ -5,8 +5,8 @@ const PROTECTED = ['blockcmd', 'unblockcmd', 'blockcmdlist'];
 
 module.exports = {
   name: 'blockcmd',
-  run: async ({ sock, groupJid, senderJid, args, plugins, reply }) => {
-    if (!U.isBotOwner(senderJid)) {
+  run: async ({ sock, groupJid, senderJid, senderPn, args, plugins, reply }) => {
+    if (!U.isBotOwner(senderJid, senderPn)) {
       return reply({ text: '🔒 Solo la creadora del bot puede usar este comando.' });
     }
     const raw = (args[0] || '').replace(/^[!.]/, '').toLowerCase();

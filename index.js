@@ -155,7 +155,7 @@ async function startBot() {
     const reply = (content, opts = {}) => sock.sendMessage(groupJid, content, { quoted: msg, ...opts });
 
     const ctx = {
-      sock, msg, groupJid, senderJid, isAdmin, args, commandText, command, reply, plugins,
+      sock, msg, groupJid, senderJid, senderPn: msg.key.participantAlt || null, isAdmin, args, commandText, command, reply, plugins,
       getTarget: () => {
         if (mentionOverride) return mentionOverride;
         const mentioned = U.getMentionedJid(msg);

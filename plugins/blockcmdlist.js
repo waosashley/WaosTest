@@ -3,8 +3,8 @@ const U = require('../lib/utils');
 module.exports = {
   name: 'blockcmdlist',
   aliases: ['bcl'],
-  run: async ({ sock, groupJid, senderJid, reply }) => {
-    if (!U.isBotOwner(senderJid)) {
+  run: async ({ sock, groupJid, senderJid, senderPn, reply }) => {
+    if (!U.isBotOwner(senderJid, senderPn)) {
       return reply({ text: '🔒 Solo la creadora del bot puede usar este comando.' });
     }
     const list = U.blockedCmds[groupJid] || [];
