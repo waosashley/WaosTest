@@ -2,7 +2,7 @@ const S = require('../lib/scheduler');
 
 const USO = 'Uso: !programar apertura|cierre HH:mm [count-tag]|[count]|[tag] [mensaje]\n'
   + 'Ej: !programar cierre 21:00 [count-tag] 🔒 Grupo cerrado, buenas noches\n'
-  + 'Otros: !programar lista | !programar cancelar <id>';
+  + 'Otros: !programar lista | !delprogramar <número de la lista>';
 
 module.exports = {
   name: 'programar',
@@ -15,19 +15,11 @@ module.exports = {
     if (sub === 'lista') {
       const list = S.listFor(groupJid);
       if (!list.length) return reply({ text: 'ℹ️ No hay acciones programadas en este grupo.' });
-      const lines = list.map(s => {
+      const lines = list.map((s, i) => {
         const op = s.countdown && s.tag ? '[count-tag]' : s.countdown ? '[count]' : s.tag ? '[tag]' : '';
-        return `#${s.id} ${s.action} ${s.time}${op ? ' ' + op : ''} (diario, hora Colombia)`;
+        return `${i + 1}. ${s.action} ${s.time}${op ? ' ' + op : ''} (diario, hora Colombia)`;
       });
       return reply({ text: `📅 Programadas:\n${lines.join('\n')}` });
-    }
-
-    if (sub === 'cancelar') {
-      const id = Number(tokens[1]);
-      if (!Number.isInteger(id) || !S.remove(id, groupJid)) {
-        return reply({ text: '❌ No encontré esa programación en este grupo. Revisa con !programar lista' });
-      }
-      return reply({ text: `✅ Programación #${id} cancelada.` });
     }
 
     if (sub !== 'apertura' && sub !== 'cierre') return reply({ text: USO });
