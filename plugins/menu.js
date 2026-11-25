@@ -26,7 +26,7 @@ const categories = [
     ['!sav', 'Responde a un vídeo → sticker con su propio audio'],
   ] },
   { title: '⚙️ Solo creadora', rows: [
-    ['!blockcmd !comando', 'Bloquea un comando en este grupo (ej. !blockcmd !sa)'],
+    ['!blockcmd !comando [mensaje]', 'Bloquea un comando en este grupo; el mensaje opcional se envía al usarlo'],
     ['!unblockcmd !comando', 'Desbloquea un comando en este grupo'],
     ['!blockcmdlist / !bcl', 'Lista los comandos bloqueados en este grupo'],
   ] },

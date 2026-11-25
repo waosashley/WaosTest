@@ -140,7 +140,14 @@ async function startBot() {
     const plugin = plugins.get(command);
     if (!plugin) return;
 
-    if (U.blockedCmds[groupJid]?.includes(plugin.name)) return;
+    if (U.blockedCmds[groupJid]?.includes(plugin.name)) {
+      const blockedMsg = U.blockedCmdMsgs[groupJid]?.[plugin.name];
+      if (blockedMsg) {
+        try { await sock.sendMessage(groupJid, { text: blockedMsg }, { quoted: msg }); }
+        catch (e) { console.error('[BLOCKED]', e); }
+      }
+      return;
+    }
 
     const isAdmin = await U.isSenderAdmin(sock, groupJid, senderJid);
     if (!isAdmin && !plugin.public) return;

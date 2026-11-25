@@ -4,8 +4,8 @@ module.exports = {
   name: 'blockcmdlist',
   aliases: ['bcl'],
   run: async ({ sock, groupJid, senderJid, reply }) => {
-    if (!(await U.isGroupCreator(sock, groupJid, senderJid))) {
-      return reply({ text: '🔒 Solo la creadora del grupo puede usar este comando.' });
+    if (!U.isBotOwner(senderJid)) {
+      return reply({ text: '🔒 Solo la creadora del bot puede usar este comando.' });
     }
     const list = U.blockedCmds[groupJid] || [];
     if (list.length === 0) return reply({ text: '✅ No hay comandos bloqueados en este grupo.' });
