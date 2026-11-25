@@ -8,6 +8,7 @@ const Trivia = require('./lib/trivia');
 const Roulette = require('./lib/ruleta');
 const Conecta4 = require('./lib/conecta4');
 const Ajedrez = require('./lib/ajedrez');
+const Battleship = require('./lib/battleship');
 
 // ---------- Plugins ----------
 const plugins = new Map();
@@ -34,6 +35,7 @@ const passiveHandlers = [
   Roulette.handleApproval,
   Conecta4.handleMove,
   Ajedrez.handleMove,
+  Battleship.handleShot,
 ];
 
 async function startBot() {
@@ -62,10 +64,18 @@ async function startBot() {
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
     const groupJid = msg.key.remoteJid;
-    if (!groupJid?.endsWith('@g.us')) return;
+    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+
+    // Chat privado: colocación de barcos de la batalla naval
+    if (!groupJid?.endsWith('@g.us')) {
+      if (text) {
+        try { await Battleship.handlePrivate(sock, msg, text); }
+        catch (e) { console.error('[PRIVATE]', e); }
+      }
+      return;
+    }
 
     const senderJid = U.getSenderJid(msg);
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
     if (U.mutedUsers[`${groupJid}:${senderJid}`]) {
       try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
