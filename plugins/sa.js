@@ -1,4 +1,5 @@
 const U = require('../lib/utils');
+const A = require('../lib/audiosticker');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -51,18 +52,17 @@ module.exports = {
       catch (e) { outId = String(Date.now()); }
       const ext = U.audioExtFromMime(au.mimetype);
       const audioPath = path.join(U.TMP_DIR, `${outId}_audio${ext}`);
-      const mp4Path = path.join(U.TMP_DIR, `${outId}.mp4`);
+      const oggPath = path.join(U.TMP_DIR, `${outId}.ogg`);
 
       try {
         await U.downloadMediaTo(au, 'audio', audioPath);
-        await U.createAudioStickerVideo(pend.stickerPath, audioPath, mp4Path, { maxDuration: 8 });
-        if (!fs.existsSync(mp4Path)) throw new Error('No se genero el video');
-        await U.sendAudioSticker(sock, groupJid, mp4Path);
+        await A.toOggOpus(audioPath, oggPath, 8);
+        await A.sendStickerWithAudio(sock, groupJid, fs.readFileSync(pend.stickerPath), oggPath);
       } catch (e) {
         console.error('[SA]', e);
         return reply({ text: '❌ No se pudo crear el sticker con audio. ' + String(e.message || e).slice(0, 120) });
       } finally {
-        for (const f of [audioPath, mp4Path]) { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {} }
+        for (const f of [audioPath, oggPath]) { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {} }
       }
       return;
     }
