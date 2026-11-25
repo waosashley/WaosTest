@@ -132,6 +132,16 @@ async function startBot() {
           return;
         }
       }
+
+      // Palabras baneadas del grupo: se borran sin aviso, excepto para la dueña (el bot no llega aquí).
+      const groupBanned = U.groupBannedWords[groupJid] || [];
+      if (groupBanned.length > 0 && !U.isBotOwner(senderJid, msg.key.participantAlt)) {
+        const nt = U.normalizeText(text);
+        if (groupBanned.some(w => nt.includes(U.normalizeText(w)))) {
+          try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
+          return;
+        }
+      }
     }
 
     // ---------- Handlers pasivos (trivia, bang, columna) ----------
