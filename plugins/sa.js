@@ -10,9 +10,9 @@ const execFileAsync = promisify(execFile);
 const DURACION_MAXIMA = 10;
 const TTL_SESION = 10 * 60 * 1000;
 const LIMITE_WEBP = 500 * 1024;
-const USO = 'Uso:\n1) Responde a un audio con *!sa* para guardarlo.\n2) Responde a una foto, vídeo o sticker con *!sa Pack | Autor* (opcional).\nSi respondes a un vídeo sin audio guardado, se usa su propio audio.';
+const USO = 'Uso: responde a un audio y luego a una foto, vídeo o sticker con *!sa* (en cualquier orden) para crear el sticker con sonido. Para usar el audio de un vídeo, usa *!sav*.\nPuedes añadir *Pack | Autor* al final.';
 
-// Sesiones de audio por grupo y usuario: "grupo:usuario" -> { ogg, seconds, ts }
+// Sesión pendiente por grupo y usuario: "grupo:usuario" -> { audio, visual, ts }
 const sesiones = new Map();
 
 // Baileys rc14 no incluye audioStickerMessage en su proto: se añade el campo al codificar.
@@ -202,7 +202,56 @@ function limpiarNombre(texto, maximo) {
   return String(texto || '').replace(/[\x00-\x1F\x7F]/g, '').trim().slice(0, maximo);
 }
 
+function sesionVigente(clave) {
+  const s = sesiones.get(clave);
+  if (s && Date.now() - s.ts < TTL_SESION) return s;
+  sesiones.delete(clave);
+  return null;
+}
+
+function guardarSesion(clave, cambios) {
+  const s = sesionVigente(clave) || { audio: null, visual: null };
+  Object.assign(s, cambios, { ts: Date.now() });
+  sesiones.set(clave, s);
+}
+
+function nombresDesde(args, msg) {
+  const texto = (args || []).join(' ').trim();
+  let packname = 'Sticker con audio';
+  let author = msg.pushName || 'User';
+  if (texto) {
+    const partes = texto.split('|');
+    packname = limpiarNombre(partes[0], 50) || packname;
+    if (partes.length > 1) author = limpiarNombre(partes.slice(1).join('|'), 50) || author;
+  }
+  return { packname, author };
+}
+
+async function generarSticker({ sock, groupJid, msg, visual, tipo, audio, packname, author }) {
+  let webp;
+  let animado;
+  if (tipo === 'sticker') {
+    webp = visual;
+    animado = esWebpAnimado(visual);
+  } else {
+    animado = tipo === 'video';
+    webp = await visualAWebp(visual, animado);
+  }
+  await enviarStickerConAudio(sock, groupJid, msg, reemplazarExifEnWebp(webp, packname, author), audio.ogg, audio.seconds, animado);
+}
+
+// Usado por !sav: el audio y la imagen salen del mismo vídeo
+async function crearStickerDeVideo({ sock, msg, groupJid, args, reply, q }) {
+  const visual = await descargar(q.media, 'video');
+  if (!visual.length) return reply({ text: '❌ No se pudo descargar el vídeo citado.' });
+  const audio = await extraerAudioDeVideo(visual);
+  if (!audio) return reply({ text: '❌ Este vídeo no tiene audio.' });
+  const { packname, author } = nombresDesde(args, msg);
+  await generarSticker({ sock, groupJid, msg, visual, tipo: 'video', audio, packname, author });
+}
+
 module.exports = {
+  crearStickerDeVideo,
   name: 'sa',
   aliases: ['stickeraudio', 'saudio'],
   run: async ({ sock, msg, groupJid, senderJid, args, reply }) => {
@@ -214,47 +263,35 @@ module.exports = {
         const raw = await descargar(q.media, 'audio');
         if (!raw.length) return reply({ text: '❌ No se pudo descargar el audio citado.' });
         const { ogg, seconds } = await convertirAOgg(raw, U.audioExtFromMime(q.media.mimetype));
-        sesiones.set(clave, { ogg, seconds, ts: Date.now() });
+        const pendiente = sesionVigente(clave);
+        if (pendiente?.visual) {
+          sesiones.delete(clave);
+          const v = pendiente.visual;
+          return await generarSticker({ sock, groupJid, msg, visual: v.buffer, tipo: v.type, audio: { ogg, seconds }, packname: v.packname, author: v.author });
+        }
+        guardarSesion(clave, { audio: { ogg, seconds } });
         return reply({ text: `🔊 Audio guardado (${seconds}s). Responde a una foto, vídeo o sticker con *!sa*.` });
       }
 
       if (!q || !['image', 'video', 'sticker'].includes(q.type)) return reply({ text: USO });
 
-      const texto = (args || []).join(' ').trim();
-      let packname = 'Sticker con audio';
-      let author = msg.pushName || 'User';
-      if (texto) {
-        const partes = texto.split('|');
-        packname = limpiarNombre(partes[0], 50) || packname;
-        if (partes.length > 1) author = limpiarNombre(partes.slice(1).join('|'), 50) || author;
-      }
-
+      const { packname, author } = nombresDesde(args, msg);
       const visual = await descargar(q.media, q.type);
       if (!visual.length) return reply({ text: '❌ No se pudo descargar el archivo citado.' });
 
-      let audio = null;
-      const sesion = sesiones.get(clave);
-      if (sesion && Date.now() - sesion.ts < TTL_SESION) {
-        audio = sesion;
-      } else if (q.type === 'video') {
-        audio = await extraerAudioDeVideo(visual);
-      }
-      if (!audio) {
-        return reply({ text: '❌ Primero responde a un audio con *!sa* (o usa un vídeo que tenga sonido).' });
+      const pendiente = sesionVigente(clave);
+      if (pendiente?.audio) {
+        sesiones.delete(clave);
+        return await generarSticker({ sock, groupJid, msg, visual, tipo: q.type, audio: pendiente.audio, packname, author });
       }
 
-      let webp;
-      let animado;
-      if (q.type === 'sticker') {
-        webp = visual;
-        animado = esWebpAnimado(visual);
-      } else {
-        animado = q.type === 'video';
-        webp = await visualAWebp(visual, animado);
+      if (q.type === 'video') {
+        const audio = await extraerAudioDeVideo(visual);
+        if (audio) return await generarSticker({ sock, groupJid, msg, visual, tipo: 'video', audio, packname, author });
       }
 
-      await enviarStickerConAudio(sock, groupJid, msg, reemplazarExifEnWebp(webp, packname, author), audio.ogg, audio.seconds, animado);
-      sesiones.delete(clave);
+      guardarSesion(clave, { visual: { buffer: visual, type: q.type, packname, author } });
+      return reply({ text: '🖼️ Contenido guardado. Responde a un audio con *!sa* para completar el sticker.' });
     } catch (e) {
       console.error('[SA]', e);
       return reply({ text: `❌ Error al crear el sticker con audio: ${String(e.message || e).slice(0, 120)}` });
