@@ -9,6 +9,7 @@ const Roulette = require('./lib/ruleta');
 const Conecta4 = require('./lib/conecta4');
 const Ajedrez = require('./lib/ajedrez');
 const Battleship = require('./lib/battleship');
+const Akinator = require('./lib/akinator');
 
 // ---------- Plugins ----------
 const plugins = new Map();
@@ -36,6 +37,7 @@ const passiveHandlers = [
   Conecta4.handleMove,
   Ajedrez.handleMove,
   Battleship.handleShot,
+  Akinator.handleAnswer,
 ];
 
 async function startBot() {

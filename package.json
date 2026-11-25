@@ -10,6 +10,7 @@
   "type": "commonjs",
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "aki-api": "^7.0.1",
     "chess.js": "^1.4.0",
     "pino": "^10.4.0",
     "qrcode-terminal": "^0.12.0",
