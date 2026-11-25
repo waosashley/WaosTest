@@ -7,6 +7,7 @@ const U = require('./lib/utils');
 const Trivia = require('./lib/trivia');
 const Roulette = require('./lib/ruleta');
 const Conecta4 = require('./lib/conecta4');
+const Ajedrez = require('./lib/ajedrez');
 
 // ---------- Plugins ----------
 const plugins = new Map();
@@ -31,6 +32,7 @@ const passiveHandlers = [
   Trivia.checkAnswer,
   Roulette.handleBang,
   Conecta4.handleMove,
+  Ajedrez.handleMove,
 ];
 
 async function startBot() {
