@@ -20,8 +20,7 @@ module.exports = {
       await U.downloadMediaTo(vid, 'video', inPath);
       await U.createVideoStickerWithAudio(inPath, mp4Path, { maxDuration: 8 });
       if (!fs.existsSync(mp4Path)) throw new Error('No se generó el video');
-      // WhatsApp no admite audio en stickers (Baileys los etiqueta como webp), así que se envía como video cuadrado con sonido.
-      await sock.sendMessage(groupJid, { video: fs.readFileSync(mp4Path), mimetype: 'video/mp4' }, { quoted: msg });
+      await U.sendAudioSticker(sock, groupJid, mp4Path);
     } catch (e) {
       console.error('[SAV]', e);
       return reply({ text: '❌ No se pudo crear el sticker con audio. ' + String(e.message || e).slice(0, 120) });
