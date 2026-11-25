@@ -1,6 +1,7 @@
 const R = require('../lib/ruleta');
 module.exports = {
   name: 'ruletafake',
+  public: true,
   run: async ({ sock, groupJid, senderJid, reply }) => {
     const r = await R.createGame(sock, groupJid, senderJid, true);
     if (!r.ok) return reply({ text: r.reason });

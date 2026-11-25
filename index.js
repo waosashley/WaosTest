@@ -31,6 +31,7 @@ for (const file of fs.readdirSync(pluginsDir)) {
 const passiveHandlers = [
   Trivia.checkAnswer,
   Roulette.handleBang,
+  Roulette.handleApproval,
   Conecta4.handleMove,
   Ajedrez.handleMove,
 ];
@@ -122,13 +123,13 @@ async function startBot() {
     if (!commandText && (text.startsWith('!') || text.startsWith('.'))) commandText = text;
     if (!commandText) return;
 
-    const isAdmin = await U.isSenderAdmin(sock, groupJid, senderJid);
-    if (!isAdmin) return;
-
     const command = commandText.slice(1).split(' ')[0].toLowerCase();
     const args = commandText.slice(1).split(' ').slice(1);
     const plugin = plugins.get(command);
     if (!plugin) return;
+
+    const isAdmin = await U.isSenderAdmin(sock, groupJid, senderJid);
+    if (!isAdmin && !plugin.public) return;
 
     const reply = (content, opts = {}) => sock.sendMessage(groupJid, content, { quoted: msg, ...opts });
 
