@@ -28,6 +28,7 @@ const categories = [
     ['!ruletarusa', 'create / unirme / iniciar / stop (bang en tu turno)'],
     ['!ruletafake', 'Ruleta sin expulsar'],
     ['!conecta4', 'unirme / iniciar / stop (6x7, 2 jugadores)'],
+    ['!ajedrez', 'unirme / iniciar / stop (mueve con E2 E4)'],
   ] },
 ];
 
