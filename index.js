@@ -137,7 +137,13 @@ async function startBot() {
       const groupBanned = U.groupBannedWords[groupJid] || [];
       if (groupBanned.length > 0 && !U.isBotOwner(senderJid, msg.key.participantAlt)) {
         const nt = U.normalizeText(text);
-        if (groupBanned.some(w => nt.includes(U.normalizeText(w)))) {
+        const st = U.squashText(text);
+        const hit = groupBanned.some(w => {
+          const sw = U.squashText(w);
+          if (sw) return st.includes(sw);
+          return nt.includes(U.normalizeText(w));
+        });
+        if (hit) {
           try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
           return;
         }
