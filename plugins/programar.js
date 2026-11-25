@@ -1,7 +1,7 @@
 const S = require('../lib/scheduler');
 
-const USO = 'Uso: !programar apertura|cierre HH:mm [contar] [tag] [mensaje]\n'
-  + 'Ej: !programar cierre 21:00 contar tag 🔒 Grupo cerrado, buenas noches\n'
+const USO = 'Uso: !programar apertura|cierre HH:mm [count-tag]|[count]|[tag] [mensaje]\n'
+  + 'Ej: !programar cierre 21:00 [count-tag] 🔒 Grupo cerrado, buenas noches\n'
   + 'Otros: !programar lista | !programar cancelar <id>';
 
 module.exports = {
@@ -15,9 +15,10 @@ module.exports = {
     if (sub === 'lista') {
       const list = S.listFor(groupJid);
       if (!list.length) return reply({ text: 'ℹ️ No hay acciones programadas en este grupo.' });
-      const lines = list.map(s =>
-        `#${s.id} ${s.action} ${s.time}${s.countdown ? ' contar' : ''}${s.tag ? ' tag' : ''} (diario, hora Colombia)`
-      );
+      const lines = list.map(s => {
+        const op = s.countdown && s.tag ? '[count-tag]' : s.countdown ? '[count]' : s.tag ? '[tag]' : '';
+        return `#${s.id} ${s.action} ${s.time}${op ? ' ' + op : ''} (diario, hora Colombia)`;
+      });
       return reply({ text: `📅 Programadas:\n${lines.join('\n')}` });
     }
 
@@ -34,17 +35,12 @@ module.exports = {
     const time = S.parseTime(tokens[1]);
     if (!time) return reply({ text: '❌ Hora inválida. Usa HH:mm, por ejemplo 21:00.\n' + USO });
 
-    let rest = tokens.slice(2);
-    let countdown = false;
-    let tag = false;
-    while (rest.length) {
-      const flag = rest[0].toLowerCase();
-      if (flag === 'contar') countdown = true;
-      else if (flag === 'tag') tag = true;
-      else break;
-      rest = rest.slice(1);
-    }
-    const message = rest.join(' ').trim() || null;
+    const OPCIONES = { 'count-tag': { countdown: true, tag: true }, count: { countdown: true, tag: false }, tag: { countdown: false, tag: true } };
+    const opcion = OPCIONES[(tokens[2] || '').replace(/^\[|\]$/g, '').toLowerCase()];
+    const hasOpcion = /^\[.*\]$/.test(tokens[2] || '');
+    if (hasOpcion && !opcion) return reply({ text: '❌ Opción inválida. Usa [count-tag], [count] o [tag].\n' + USO });
+    const { countdown = false, tag = false } = opcion || {};
+    const message = tokens.slice(hasOpcion ? 3 : 2).join(' ').trim() || null;
 
     const entry = S.add({ groupJid, action: sub, time: time.time, countdown, tag, message });
     const extra = [countdown && 'cuenta regresiva', tag && 'mención a todos'].filter(Boolean);
