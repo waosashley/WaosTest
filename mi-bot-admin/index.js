@@ -62,6 +62,8 @@ async function startBot() {
     if (!groupJid?.endsWith('@g.us')) return;
 
     const senderJid = U.getSenderJid(msg);
+    const senderJids = await U.resolveSenderJids(sock, groupJid, msg);
+    const isOwner = U.isOwner(senderJids);
     const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
     if (U.mutedUsers[`${groupJid}:${senderJid}`]) {
@@ -120,7 +122,7 @@ async function startBot() {
     if (!commandText && (text.startsWith('!') || text.startsWith('.'))) commandText = text;
     if (!commandText) return;
 
-    const isAdmin = await U.isSenderAdmin(sock, groupJid, senderJid);
+    const isAdmin = isOwner || await U.isSenderAdmin(sock, groupJid, senderJid);
     if (!isAdmin) return;
 
     const command = commandText.slice(1).split(' ')[0].toLowerCase();
@@ -131,7 +133,7 @@ async function startBot() {
     const reply = (content, opts = {}) => sock.sendMessage(groupJid, content, { quoted: msg, ...opts });
 
     const ctx = {
-      sock, msg, groupJid, senderJid, isAdmin, args, commandText, command, reply, plugins,
+      sock, msg, groupJid, senderJid, senderJids, isAdmin, isOwner, args, commandText, command, reply, plugins,
       getTarget: () => {
         if (mentionOverride) return mentionOverride;
         const mentioned = U.getMentionedJid(msg);
