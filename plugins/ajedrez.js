@@ -3,12 +3,14 @@ const A = require('../lib/ajedrez');
 
 module.exports = {
   name: 'ajedrez',
+  public: true,
   aliases: ['chess'],
-  run: async ({ sock, groupJid, senderJid, args, reply }) => {
+  run: async ({ sock, groupJid, senderJid, isAdmin, args, reply }) => {
     const sub = args[0]?.toLowerCase();
     if (sub === 'stop' || sub === 'cancelar') {
       const g = U.activeGames.get(groupJid);
       if (!g || g.type !== 'ajedrez') return reply({ text: 'No hay ajedrez activo.' });
+      if (g.creator !== senderJid && !g.players.includes(senderJid) && !isAdmin) return reply({ text: 'Solo un jugador o un admin lo detiene.' });
       await A.stopGame(sock, groupJid);
       return reply({ text: '🛑 Ajedrez detenido.' });
     }

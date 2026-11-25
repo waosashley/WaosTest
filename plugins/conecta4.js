@@ -3,13 +3,14 @@ const C4 = require('../lib/conecta4');
 
 module.exports = {
   name: 'conecta4',
+  public: true,
   aliases: ['c4'],
-  run: async ({ sock, groupJid, senderJid, args, reply }) => {
+  run: async ({ sock, groupJid, senderJid, isAdmin, args, reply }) => {
     const sub = args[0]?.toLowerCase();
     if (sub === 'stop' || sub === 'cancelar') {
       const g = U.activeGames.get(groupJid);
       if (!g || g.type !== 'conecta4') return reply({ text: 'No hay conecta 4 activo.' });
-      if (g.creator !== senderJid) return reply({ text: 'Solo el creador lo detiene.' });
+      if (g.creator !== senderJid && !isAdmin) return reply({ text: 'Solo el creador o un admin lo detiene.' });
       await C4.stopGame(sock, groupJid);
       return reply({ text: '🛑 Conecta 4 detenido.' });
     }

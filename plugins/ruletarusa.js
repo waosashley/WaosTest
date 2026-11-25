@@ -3,16 +3,19 @@ const R = require('../lib/ruleta');
 
 module.exports = {
   name: 'ruletarusa',
+  public: true,
   aliases: ['ruleta'],
-  run: async ({ sock, groupJid, senderJid, args, reply }) => {
+  run: async ({ sock, msg, groupJid, senderJid, isAdmin, args, reply }) => {
     const sub = args[0]?.toLowerCase();
     if (sub === 'create' || !sub) {
+      if (!isAdmin) {
+        const q = await R.requestApproval(sock, groupJid, senderJid, msg);
+        if (!q.ok) return reply({ text: q.reason });
+        return;
+      }
       const r = await R.createGame(sock, groupJid, senderJid, false);
       if (!r.ok) return reply({ text: r.reason });
-      return reply({
-        text: `🔫 *Ruleta rusa creada*\n\nCreador: @${senderJid.split('@')[0]}\n60s para unirse con *!ruletarusa unirme*.\nMáx 4 jugadores.\n\nRevólver: 12 recámaras, 1 bala.\nCada uno escribe *bang* en su turno.\nEl que reciba la bala es expulsado.\n\nEl creador inicia con *!ruletarusa iniciar*.`,
-        mentions: [senderJid],
-      });
+      return reply({ text: R.rusaCreatedText(senderJid), mentions: [senderJid] });
     }
     if (sub === 'unirme' || sub === 'join') {
       const g = U.activeGames.get(groupJid);
@@ -37,7 +40,7 @@ module.exports = {
     if (sub === 'stop') {
       const g = U.activeGames.get(groupJid);
       if (!g || g.type !== 'ruleta') return reply({ text: 'No hay ruleta.' });
-      if (g.creator !== senderJid) return reply({ text: 'Solo el creador la detiene.' });
+      if (g.creator !== senderJid && !isAdmin) return reply({ text: 'Solo el creador o un admin la detiene.' });
       await R.stopGame(sock, groupJid);
       return reply({ text: '🛑 Ruleta detenida.' });
     }

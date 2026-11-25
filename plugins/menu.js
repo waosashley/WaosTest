@@ -22,6 +22,7 @@ const categories = [
     ['!delcmd', 'Responde a un sticker para eliminarlo'],
     ['!listcmd', 'Comandos registrados'],
     ['!sa', 'Sticker + audio (responde a cada uno con !sa)'],
+    ['!modvoice aguda/grave N', 'Responde a un audio; cambia el tono (1-12) y lo envía como nota de voz'],
   ] },
   { title: '🎮 Juegos', rows: [
     ['!triviamath', 'Trivia (rank / stop)'],
