@@ -5,6 +5,7 @@ module.exports = {
   aliases: ['bcl'],
   run: async ({ sock, groupJid, senderJid, senderPn, reply }) => {
     if (!U.isBotOwner(senderJid, senderPn)) {
+      console.log('[OWNER-DEBUG]', JSON.stringify({ senderJid, senderPn, senderPnType: typeof senderPn }));
       return reply({ text: '🔒 Solo la creadora del bot puede usar este comando.' });
     }
     const list = U.blockedCmds[groupJid] || [];
