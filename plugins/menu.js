@@ -24,6 +24,11 @@ const categories = [
     ['!sa', 'Sticker + audio (responde a cada uno con !sa)'],
     ['!modvoice aguda/grave N', 'Responde a un audio; cambia el tono (1-12) y lo envía como nota de voz'],
   ] },
+  { title: '⚙️ Solo creadora', rows: [
+    ['!blockcmd !comando', 'Bloquea un comando en este grupo (ej. !blockcmd !sa)'],
+    ['!unblockcmd !comando', 'Desbloquea un comando en este grupo'],
+    ['!blockcmdlist / !bcl', 'Lista los comandos bloqueados en este grupo'],
+  ] },
   { title: '🎮 Juegos', rows: [
     ['!triviamath', 'Trivia (rank / stop)'],
     ['!ruletarusa', 'create / unirme / iniciar / stop (bang en tu turno)'],

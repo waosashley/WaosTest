@@ -33,6 +33,7 @@ async function resolveStickerPath(msg) {
 module.exports = {
   name: 'sa',
   aliases: ['stickeraudio'],
+  public: true,
   run: async ({ sock, groupJid, senderJid, msg, reply }) => {
     cleanupTmp();
     const key = `${groupJid}:${senderJid}`;
