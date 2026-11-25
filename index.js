@@ -10,6 +10,7 @@ const Conecta4 = require('./lib/conecta4');
 const Ajedrez = require('./lib/ajedrez');
 const Battleship = require('./lib/battleship');
 const Akinator = require('./lib/akinator');
+const Scheduler = require('./lib/scheduler');
 
 // ---------- Plugins ----------
 const plugins = new Map();
@@ -52,7 +53,10 @@ async function startBot() {
   sock.ev.on('connection.update', (u) => {
     const { connection, lastDisconnect, qr } = u;
     if (qr) { console.log('\n📲 Escanea este QR:\n'); qrcode.generate(qr, { small: true }); }
-    if (connection === 'open') console.log('✅ Conectado como', sock.user?.id);
+    if (connection === 'open') {
+      console.log('✅ Conectado como', sock.user?.id);
+      Scheduler.attach(sock);
+    }
     if (connection === 'close') {
       const rc = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       if (rc) startBot(); else console.log('❌ Sesión cerrada.');
