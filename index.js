@@ -11,6 +11,7 @@ const Ajedrez = require('./lib/ajedrez');
 const Battleship = require('./lib/battleship');
 const Akinator = require('./lib/akinator');
 const Scheduler = require('./lib/scheduler');
+const Mutes = require('./lib/mutes');
 
 // ---------- Plugins ----------
 const plugins = new Map();
@@ -90,7 +91,7 @@ async function startBot() {
 
     const senderJid = U.getSenderJid(msg);
 
-    if (U.mutedUsers[`${groupJid}:${senderJid}`]) {
+    if (Mutes.estaMuteado(groupJid, senderJid)) {
       try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
       return;
     }
@@ -138,6 +139,12 @@ async function startBot() {
       if (groupBanned.length > 0 && !U.isBotOwner(senderJid, msg.key.participantAlt)) {
         if (groupBanned.some(w => U.contieneBaneada(text, w))) {
           try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
+          if (!(await U.isSenderAdmin(sock, groupJid, senderJid)) && Mutes.registrarEvasion(groupJid, senderJid)) {
+            await sock.sendMessage(groupJid, {
+              text: `🔇 @${senderJid.split('@')[0]} fue silenciado 1 día por intentar evadir palabras baneadas.`,
+              mentions: [senderJid],
+            }).catch(() => {});
+          }
           return;
         }
       }
