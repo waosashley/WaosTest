@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const { isOwner, getSenderJids, resolveSenderJids } = require('./owner');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const STICKERS_DIR = path.join(DATA_DIR, 'stickers');
@@ -89,5 +90,6 @@ module.exports = {
   warns, bannedWords, bannedStickers, stickerCommands, mutedUsers, triviaWins,
   activeGames, pendingTrivia,
   sleep, shuffle, normalizeText, userNum, isSenderAdmin,
+  isOwner, getSenderJids, resolveSenderJids,
   getSenderJid, getMentionedJid, hashToHex, sha256Hex, downloadStickerBuffer,
 };
