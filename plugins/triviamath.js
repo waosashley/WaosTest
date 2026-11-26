@@ -13,6 +13,7 @@ module.exports = {
       if (!state) return reply({ text: 'No hay trivia activa.' });
       clearTimeout(state.timeout);
       U.pendingTrivia.delete(groupJid);
+      T.marcarFin(groupJid);
       return reply({ text: `🛑 Trivia cancelada. La respuesta era *${state.answer}*.` });
     }
 
@@ -29,6 +30,9 @@ module.exports = {
         mentions: entries.map(([j]) => j),
       });
     }
+
+    const restante = T.cooldownRestante(groupJid);
+    if (restante > 0) return reply({ text: `⏳ Espera ${Math.ceil(restante / 1000)} s para la siguiente trivia.` });
 
     return T.startGame(sock, groupJid);
   },
