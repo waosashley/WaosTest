@@ -33,7 +33,7 @@ const CATEGORIES = [
   ] },
   { key: 'juegos', title: '🎮 Juegos', items: [
     ['!buscaminas', 'facil / medio / dificil / multi (A1 e · A1 b)'],
-    ['!triviamath', 'Trivia (rank / stop)'],
+    ['!triviamath', 'Trivia (rank / stop) · alias !tm'],
     ['!ruletarusa', 'create / unirme / iniciar / stop (bang en tu turno)'],
     ['!ruletafake', 'Ruleta sin expulsar'],
     ['!conecta4', 'unirme / iniciar / stop (6x7, 2 jugadores)'],
