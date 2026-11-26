@@ -5,7 +5,7 @@ module.exports = {
   name: 'triviamath',
   aliases: ['math', 'matetrivia'],
   public: true,
-  run: async ({ sock, groupJid, args, reply }) => {
+  run: async ({ sock, groupJid, senderJid, args, reply }) => {
     const sub = args[0]?.toLowerCase();
 
     if (sub === 'stop' || sub === 'cancelar') {
@@ -13,7 +13,7 @@ module.exports = {
       if (!state) return reply({ text: 'No hay trivia activa.' });
       clearTimeout(state.timeout);
       U.pendingTrivia.delete(groupJid);
-      T.marcarFin(groupJid);
+      T.marcarFin(state.starter);
       return reply({ text: `🛑 Trivia cancelada. La respuesta era *${state.answer}*.` });
     }
 
@@ -31,9 +31,9 @@ module.exports = {
       });
     }
 
-    const restante = T.cooldownRestante(groupJid);
-    if (restante > 0) return reply({ text: `⏳ Espera ${Math.ceil(restante / 1000)} s para la siguiente trivia.` });
+    const restante = T.cooldownRestante(senderJid);
+    if (restante > 0) return reply({ text: `⏳ Espera ${Math.ceil(restante / 1000)} s para lanzar otra trivia.` });
 
-    return T.startGame(sock, groupJid);
+    return T.startGame(sock, groupJid, senderJid);
   },
 };
