@@ -7,6 +7,8 @@ const U = require('./lib/utils');
 const Trivia = require('./lib/trivia');
 const Roulette = require('./lib/ruleta');
 const Conecta4 = require('./lib/conecta4');
+const Buscaminas = require('./lib/buscaminas');
+const Polls = require('./lib/polls');
 const Ajedrez = require('./lib/ajedrez');
 const Battleship = require('./lib/battleship');
 const Akinator = require('./lib/akinator');
@@ -37,6 +39,7 @@ const passiveHandlers = [
   Roulette.handleBang,
   Roulette.handleApproval,
   Conecta4.handleMove,
+  Buscaminas.handleMove,
   Ajedrez.handleMove,
   Battleship.handleShot,
   Akinator.handleAnswer,
@@ -159,6 +162,9 @@ async function startBot() {
       }
     }
 
+    // Voto en una encuesta del menú: se ejecuta el comando de la opción elegida
+    if (!commandText && msg.message.pollUpdateMessage) commandText = Polls.getVotedCommand(msg);
+
     if (!commandText && (text.startsWith('!') || text.startsWith('.'))) commandText = text;
     if (!commandText) return;
 
@@ -182,7 +188,7 @@ async function startBot() {
     const reply = (content, opts = {}) => sock.sendMessage(groupJid, content, { quoted: msg, ...opts });
 
     const ctx = {
-      sock, msg, groupJid, senderJid, senderPn: msg.key.participantAlt || null, isAdmin, args, commandText, command, reply, plugins,
+      sock, msg, groupJid, senderJid, senderPn: msg.key.participantAlt || null, isAdmin, isOwner: U.isBotOwner(senderJid, msg.key.participantAlt), args, commandText, command, reply, plugins,
       getTarget: () => {
         if (mentionOverride) return mentionOverride;
         const mentioned = U.getMentionedJid(msg);
