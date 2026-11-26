@@ -4,6 +4,7 @@ const U = require('../lib/utils');
 module.exports = {
   name: 'triviamath',
   aliases: ['math', 'matetrivia'],
+  public: true,
   run: async ({ sock, groupJid, args, reply }) => {
     const sub = args[0]?.toLowerCase();
 
