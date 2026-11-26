@@ -56,9 +56,10 @@ module.exports = {
       });
     }
 
-    const restante = T.cooldownRestante(senderJid);
+    const esOwner = U.isBotOwner(senderJid, senderPn);
+    const restante = T.cooldownRestante(senderJid, esOwner);
     if (restante > 0) return reply({ text: `⏳ Espera ${Math.ceil(restante / 1000)} s para lanzar otra trivia.` });
 
-    return T.startGame(sock, groupJid, senderJid, U.isBotOwner(senderJid, senderPn));
+    return T.startGame(sock, groupJid, senderJid, esOwner);
   },
 };
