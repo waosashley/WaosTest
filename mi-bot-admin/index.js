@@ -7,6 +7,7 @@ const U = require('./lib/utils');
 const Trivia = require('./lib/trivia');
 const Roulette = require('./lib/ruleta');
 const Conecta4 = require('./lib/conecta4');
+const Buscaminas = require('./lib/buscaminas');
 
 // ---------- Plugins ----------
 const plugins = new Map();
@@ -31,6 +32,7 @@ const passiveHandlers = [
   Trivia.checkAnswer,
   Roulette.handleBang,
   Conecta4.handleMove,
+  Buscaminas.handleMove,
 ];
 
 async function startBot() {
@@ -123,12 +125,12 @@ async function startBot() {
     if (!commandText) return;
 
     const isAdmin = isOwner || await U.isSenderAdmin(sock, groupJid, senderJid);
-    if (!isAdmin) return;
 
     const command = commandText.slice(1).split(' ')[0].toLowerCase();
     const args = commandText.slice(1).split(' ').slice(1);
     const plugin = plugins.get(command);
     if (!plugin) return;
+    if (!isAdmin && !plugin.public) return;
 
     const reply = (content, opts = {}) => sock.sendMessage(groupJid, content, { quoted: msg, ...opts });
 

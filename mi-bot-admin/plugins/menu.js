@@ -33,5 +33,8 @@ module.exports = {
 !conecta4 unirme — segundo jugador se une
 !conecta4 iniciar — creador inicia
 !conecta4 stop — cancela
+!buscaminas facil|medio|dificil — buscaminas con imagen
+!buscaminas stop — cancela
+!cooldown @usuario off — quita el cooldown de buscaminas (solo dueña)
 !menu — esta lista` }),
 };
