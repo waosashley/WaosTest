@@ -56,6 +56,8 @@ module.exports = {
       });
     }
 
+    if (U.pendingTrivia.has(groupJid)) return reply({ text: '⏳ Ya hay una trivia activa en este grupo. Espera a que termine.' });
+
     const esOwner = U.isBotOwner(senderJid, senderPn);
     const restante = T.cooldownRestante(senderJid, esOwner);
     if (restante > 0) return reply({ text: `⏳ Espera ${Math.ceil(restante / 1000)} s para lanzar otra trivia.` });
