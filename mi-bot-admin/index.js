@@ -8,6 +8,7 @@ const Trivia = require('./lib/trivia');
 const Roulette = require('./lib/ruleta');
 const Conecta4 = require('./lib/conecta4');
 const Buscaminas = require('./lib/buscaminas');
+const Polls = require('./lib/polls');
 
 // ---------- Plugins ----------
 const plugins = new Map();
@@ -34,6 +35,32 @@ const passiveHandlers = [
   Conecta4.handleMove,
   Buscaminas.handleMove,
 ];
+
+async function dispatchCommand(sock, msg, groupJid, senderJid, senderJids, isOwner, commandText, mentionOverride) {
+  const isAdmin = isOwner || await U.isSenderAdmin(sock, groupJid, senderJid);
+
+  const command = commandText.slice(1).split(' ')[0].toLowerCase();
+  const args = commandText.slice(1).split(' ').slice(1);
+  const plugin = plugins.get(command);
+  if (!plugin) return;
+  if (!isAdmin && !plugin.public) return;
+
+  const reply = (content, opts = {}) => sock.sendMessage(groupJid, content, { quoted: msg, ...opts });
+
+  const ctx = {
+    sock, msg, groupJid, senderJid, senderJids, isAdmin, isOwner, args, commandText, command, reply, plugins,
+    getTarget: () => {
+      if (mentionOverride) return mentionOverride;
+      const mentioned = U.getMentionedJid(msg);
+      if (mentioned) return mentioned;
+      const c = msg.message?.extendedTextMessage?.contextInfo || msg.message?.stickerMessage?.contextInfo;
+      return c?.participant || null;
+    },
+  };
+
+  try { await plugin.run(ctx); }
+  catch (e) { console.error(`[PLUGIN ${command}]`, e); }
+}
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_session');
@@ -67,6 +94,13 @@ async function startBot() {
     const senderJids = await U.resolveSenderJids(sock, groupJid, msg);
     const isOwner = U.isOwner(senderJids);
     const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+
+    if (msg.message.pollUpdateMessage) {
+      if (U.mutedUsers[`${groupJid}:${senderJid}`]) return;
+      const votedCmd = Polls.getVotedCommand(msg);
+      if (votedCmd) await dispatchCommand(sock, msg, groupJid, senderJid, senderJids, isOwner, votedCmd, null);
+      return;
+    }
 
     if (U.mutedUsers[`${groupJid}:${senderJid}`]) {
       try { await sock.sendMessage(groupJid, { delete: msg.key }); } catch (e) {}
@@ -124,29 +158,7 @@ async function startBot() {
     if (!commandText && (text.startsWith('!') || text.startsWith('.'))) commandText = text;
     if (!commandText) return;
 
-    const isAdmin = isOwner || await U.isSenderAdmin(sock, groupJid, senderJid);
-
-    const command = commandText.slice(1).split(' ')[0].toLowerCase();
-    const args = commandText.slice(1).split(' ').slice(1);
-    const plugin = plugins.get(command);
-    if (!plugin) return;
-    if (!isAdmin && !plugin.public) return;
-
-    const reply = (content, opts = {}) => sock.sendMessage(groupJid, content, { quoted: msg, ...opts });
-
-    const ctx = {
-      sock, msg, groupJid, senderJid, senderJids, isAdmin, isOwner, args, commandText, command, reply, plugins,
-      getTarget: () => {
-        if (mentionOverride) return mentionOverride;
-        const mentioned = U.getMentionedJid(msg);
-        if (mentioned) return mentioned;
-        const c = msg.message?.extendedTextMessage?.contextInfo || msg.message?.stickerMessage?.contextInfo;
-        return c?.participant || null;
-      },
-    };
-
-    try { await plugin.run(ctx); }
-    catch (e) { console.error(`[PLUGIN ${command}]`, e); }
+    await dispatchCommand(sock, msg, groupJid, senderJid, senderJids, isOwner, commandText, mentionOverride);
   });
 }
 

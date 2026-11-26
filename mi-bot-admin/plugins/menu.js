@@ -1,40 +1,78 @@
+const Polls = require('../lib/polls');
+
+const CATEGORIES = {
+  buscaminas: {
+    title: '🎲 Buscaminas y trivia',
+    options: [
+      { label: '🟢 Buscaminas fácil', cmd: '!buscaminas facil' },
+      { label: '🟡 Buscaminas medio', cmd: '!buscaminas medio' },
+      { label: '🔴 Buscaminas difícil', cmd: '!buscaminas dificil' },
+      { label: '⛔ Cancelar buscaminas', cmd: '!buscaminas stop' },
+      { label: '🧮 Trivia matemática', cmd: '!triviamath' },
+      { label: '🏆 Ranking de trivia', cmd: '!triviamath rank' },
+      { label: '🛑 Cancelar trivia', cmd: '!triviamath stop' },
+    ],
+  },
+  ruleta: {
+    title: '🎮 Ruleta y Conecta 4',
+    options: [
+      { label: '🔫 Ruleta rusa: crear', cmd: '!ruletarusa create' },
+      { label: '✅ Ruleta rusa: unirme', cmd: '!ruletarusa unirme' },
+      { label: '▶️ Ruleta rusa: iniciar', cmd: '!ruletarusa iniciar' },
+      { label: '🛑 Ruleta rusa: cancelar', cmd: '!ruletarusa stop' },
+      { label: '🎭 Ruleta fake', cmd: '!ruletafake' },
+      { label: '🔴 Conecta 4: crear', cmd: '!conecta4' },
+      { label: '✅ Conecta 4: unirme', cmd: '!conecta4 unirme' },
+      { label: '▶️ Conecta 4: iniciar', cmd: '!conecta4 iniciar' },
+      { label: '🛑 Conecta 4: cancelar', cmd: '!conecta4 stop' },
+    ],
+  },
+  moderacion: {
+    title: '🛡️ Moderación y stickers',
+    options: [
+      { label: '🔒 Cerrar grupo', cmd: '!mute' },
+      { label: '🔓 Abrir grupo', cmd: '!unmute' },
+      { label: '🚫 Palabras prohibidas', cmd: '!listbanwords' },
+      { label: '🚫 Stickers baneados', cmd: '!stickersbans' },
+      { label: '🧷 Comandos de stickers', cmd: '!listcmd' },
+    ],
+  },
+};
+
+const PARAMS_TEXT = `*Comandos con parámetros*
+
+!kick @usuario — saca a alguien
+!warn @usuario — advertencia (3 y se va)
+!mute @usuario — silencia a alguien
+!unmute @usuario — desilencia
+!banword @usuario palabras — prohíbe palabras
+!unbanword @usuario — quita prohibiciones
+!bansticker (responder sticker) — prohíbe sticker
+!unbansticker (responder sticker) — lo quita
+!addcmd !comando (responder sticker) — registra sticker
+!delcmd (responder sticker) — elimina comando
+!cooldown @usuario off — quita cooldown de buscaminas (solo dueña)`;
+
+const MAIN_TITLE = '🤖 ASHP BOT · MENÚ';
+
 module.exports = {
   name: 'menu',
   aliases: ['help', 'comandos'],
-  run: async ({ reply }) => reply({ text:
-`ASHP̸̪̪̫͌͘̕P̴̡͙̘͋͝I̸͚̪͙̐̓̽E̴͕͙̻͊͐͝_BOT_V1.3
+  public: true,
+  run: async ({ sock, groupJid, msg, args, reply }) => {
+    const key = (args[0] || '').toLowerCase();
 
-*Comandos*
+    if (key === 'params') return reply({ text: PARAMS_TEXT });
 
-!mute — cierra el grupo
-!mute @usuario — silencia a alguien
-!unmute — abre el grupo
-!unmute @usuario — desilencia
-!kick @usuario — saca a alguien
-!warn @usuario — advertencia (3 y se va)
-!banword @usuario palabras — prohíbe palabras
-!unbanword @usuario — quita prohibiciones
-!bansticker (resp. sticker) — prohíbe sticker
-!unbansticker (resp. sticker) — lo quita
-!stickersbans — stickers prohibidos
-!listbanwords — palabras prohibidas
-!addcmd !comando (resp. sticker) — registra sticker
-!delcmd (resp. sticker) — elimina comando
-!listcmd — comandos registrados
-!triviamath — trivia matemática (responde citando)
-!triviamath rank — ranking de victorias
-!triviamath stop — cancela trivia
-!ruletarusa create — crea ruleta (12 recámaras, escribe bang en tu turno)
-!ruletarusa unirme — únete (60s, máx 4)
-!ruletarusa iniciar — creador inicia
-!ruletarusa stop — cancela
-!ruletafake — ruleta sin expulsar
-!conecta4 — crea conecta 4 (6x7, 2 jugadores)
-!conecta4 unirme — segundo jugador se une
-!conecta4 iniciar — creador inicia
-!conecta4 stop — cancela
-!buscaminas facil|medio|dificil — buscaminas con imagen
-!buscaminas stop — cancela
-!cooldown @usuario off — quita el cooldown de buscaminas (solo dueña)
-!menu — esta lista` }),
+    const category = CATEGORIES[key];
+    if (category) {
+      return Polls.sendPoll(sock, groupJid, { title: category.title, options: category.options, quoted: msg });
+    }
+
+    const options = [
+      ...Object.entries(CATEGORIES).map(([id, c]) => ({ label: c.title, cmd: `!menu ${id}` })),
+      { label: '📋 Comandos con @usuario', cmd: '!menu params' },
+    ];
+    return Polls.sendPoll(sock, groupJid, { title: MAIN_TITLE, options, quoted: msg });
+  },
 };
