@@ -7,6 +7,9 @@ const CATEGORIES = {
       { label: '🟢 Buscaminas fácil', cmd: '!buscaminas facil' },
       { label: '🟡 Buscaminas medio', cmd: '!buscaminas medio' },
       { label: '🔴 Buscaminas difícil', cmd: '!buscaminas dificil' },
+      { label: '👥 Buscaminas multijugador', cmd: '!buscaminas multi' },
+      { label: '✅ Buscaminas: unirme', cmd: '!buscaminas unirme' },
+      { label: '▶️ Buscaminas: iniciar', cmd: '!buscaminas iniciar' },
       { label: '⛔ Cancelar buscaminas', cmd: '!buscaminas stop' },
       { label: '🧮 Trivia matemática', cmd: '!triviamath' },
       { label: '🏆 Ranking de trivia', cmd: '!triviamath rank' },
@@ -51,6 +54,10 @@ const PARAMS_TEXT = `*Comandos con parámetros*
 !unbansticker (responder sticker) — lo quita
 !addcmd !comando (responder sticker) — registra sticker
 !delcmd (responder sticker) — elimina comando
+A1 e — excava la casilla A1 (durante una partida)
+A1 b — pone o quita bandera (durante una partida)
+A1e B2e C3b — varias jugadas en un mensaje
+!buscaminas multi facil — multijugador por turnos (2 a 4)
 !cooldown @usuario off — quita cooldown de buscaminas (solo dueña)`;
 
 const MAIN_TITLE = '🤖 ASHP BOT · MENÚ';
