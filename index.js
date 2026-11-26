@@ -186,13 +186,14 @@ async function startBot() {
       return;
     }
 
-    const isAdmin = await U.isSenderAdmin(sock, groupJid, senderJid);
+    const isOwner = U.isBotOwner(senderJid, msg.key.participantAlt);
+    const isAdmin = isOwner || await U.isSenderAdmin(sock, groupJid, senderJid);
     if (!isAdmin && !plugin.public) return;
 
     const reply = (content, opts = {}) => sock.sendMessage(groupJid, content, { quoted: msg, ...opts });
 
     const ctx = {
-      sock, msg, groupJid, senderJid, senderPn: msg.key.participantAlt || null, isAdmin, isOwner: U.isBotOwner(senderJid, msg.key.participantAlt), args, commandText, command, reply, plugins,
+      sock, msg, groupJid, senderJid, senderPn: msg.key.participantAlt || null, isAdmin, isOwner, args, commandText, command, reply, plugins,
       getTarget: () => {
         if (mentionOverride) return mentionOverride;
         const mentioned = U.getMentionedJid(msg);
