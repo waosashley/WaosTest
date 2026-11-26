@@ -21,12 +21,8 @@ module.exports = {
       for (const wins of Object.values(U.triviaWins)) {
         for (const [jid, w] of Object.entries(wins)) totales[jid] = (totales[jid] || 0) + w;
       }
-      const mejorRacha = {};
-      for (const rachas of Object.values(U.triviaStreak)) {
-        for (const [jid, r] of Object.entries(rachas)) mejorRacha[jid] = Math.max(mejorRacha[jid] || 0, r);
-      }
       const entries = Object.entries(totales).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      const rachas = Object.entries(mejorRacha).filter(([, r]) => r > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      const rachas = Object.entries(U.triviaStreak).filter(([, r]) => r > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
       if (!entries.length && !rachas.length) return reply({ text: 'Nadie ha ganado todavía.' });
       const medals = ['🥇', '🥈', '🥉'];
       const sections = [];
