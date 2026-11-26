@@ -81,10 +81,12 @@ module.exports = {
   name: 'menu',
   aliases: ['help', 'comandos'],
   public: true,
-  run: async ({ args, reply }) => {
+  run: async ({ args, reply, sock, groupJid }) => {
     if ((args[0] || '').toLowerCase() === 'params') return reply({ text: PARAMS_TEXT });
 
-    return reply({
+    // Baileys 7.0.0-rc14 sendMessage no soporta listMessage (lanza "Invalid media type"),
+    // así que se envía el proto directamente con relayMessage.
+    await sock.relayMessage(groupJid, {
       listMessage: {
         title: MAIN_TITLE,
         description: 'Toca *Ver comandos* y elige uno: se ejecuta al seleccionarlo.',
@@ -96,6 +98,6 @@ module.exports = {
           rows: s.rows.map(([cmd, desc]) => ({ title: cmd, description: desc, rowId: cmd })),
         })),
       },
-    });
+    }, {});
   },
 };
