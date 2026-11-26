@@ -94,17 +94,12 @@ module.exports = {
       })),
     });
     await sock.relayMessage(groupJid, {
-      viewOnceMessage: {
-        message: {
-          messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-          interactiveMessage: {
-            header: { title: MAIN_TITLE, hasMediaAttachment: false },
-            body: { text: 'Toca *Ver comandos* y elige uno: se ejecuta al seleccionarlo.' },
-            footer: { text: 'Comandos con @usuario: !menu params' },
-            nativeFlowMessage: {
-              buttons: [{ name: 'single_select', buttonParamsJson }],
-            },
-          },
+      interactiveMessage: {
+        header: { title: MAIN_TITLE, hasMediaAttachment: false },
+        body: { text: 'Toca *Ver comandos* y elige uno: se ejecuta al seleccionarlo.' },
+        footer: { text: 'Comandos con @usuario: !menu params' },
+        nativeFlowMessage: {
+          buttons: [{ name: 'single_select', buttonParamsJson }],
         },
       },
     }, {
