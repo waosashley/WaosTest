@@ -1,5 +1,3 @@
-const Polls = require('../lib/polls');
-
 const CATEGORIES = {
   buscaminas: {
     title: '🎲 Buscaminas y trivia',
@@ -66,20 +64,20 @@ module.exports = {
   name: 'menu',
   aliases: ['help', 'comandos'],
   public: true,
-  run: async ({ sock, groupJid, msg, args, reply }) => {
+  run: async ({ args, reply }) => {
     const key = (args[0] || '').toLowerCase();
 
     if (key === 'params') return reply({ text: PARAMS_TEXT });
 
     const category = CATEGORIES[key];
     if (category) {
-      return Polls.sendPoll(sock, groupJid, { title: category.title, options: category.options, quoted: msg });
+      const lines = category.options.map(o => `${o.label}\n   ${o.cmd}`);
+      return reply({ text: `*${category.title}*\n\n${lines.join('\n')}\n\n_Escribe el comando para usarlo._` });
     }
 
-    const options = [
-      ...Object.entries(CATEGORIES).map(([id, c]) => ({ label: c.title, cmd: `!menu ${id}` })),
-      { label: '📋 Comandos con @usuario', cmd: '!menu params' },
-    ];
-    return Polls.sendPoll(sock, groupJid, { title: MAIN_TITLE, options, quoted: msg });
+    const cats = Object.entries(CATEGORIES).map(([id, c]) => `• ${c.title} → *!menu ${id}*`);
+    return reply({
+      text: `*${MAIN_TITLE}*\n\n${cats.join('\n')}\n• 📋 Comandos con @usuario → *!menu params*`,
+    });
   },
 };
