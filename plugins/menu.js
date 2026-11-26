@@ -84,20 +84,39 @@ module.exports = {
   run: async ({ args, reply, sock, groupJid }) => {
     if ((args[0] || '').toLowerCase() === 'params') return reply({ text: PARAMS_TEXT });
 
-    // Baileys 7.0.0-rc14 sendMessage no soporta listMessage (lanza "Invalid media type"),
-    // así que se envía el proto directamente con relayMessage.
+    // listMessage legado no se muestra en cuentas normales; se usa interactiveMessage (single_select nativo).
+    // Baileys 7.0.0-rc14 sendMessage no lo soporta, así que se envía con relayMessage + nodo biz.
+    const buttonParamsJson = JSON.stringify({
+      title: '📋 Ver comandos',
+      sections: SECTIONS.map(s => ({
+        title: s.title,
+        rows: s.rows.map(([cmd, desc]) => ({ header: s.title, title: cmd, description: desc, id: cmd })),
+      })),
+    });
     await sock.relayMessage(groupJid, {
-      listMessage: {
-        title: MAIN_TITLE,
-        description: 'Toca *Ver comandos* y elige uno: se ejecuta al seleccionarlo.',
-        buttonText: '📋 Ver comandos',
-        footerText: 'Comandos con @usuario: !menu params',
-        listType: 1,
-        sections: SECTIONS.map(s => ({
-          title: s.title,
-          rows: s.rows.map(([cmd, desc]) => ({ title: cmd, description: desc, rowId: cmd })),
-        })),
+      viewOnceMessage: {
+        message: {
+          messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+          interactiveMessage: {
+            header: { title: MAIN_TITLE, hasMediaAttachment: false },
+            body: { text: 'Toca *Ver comandos* y elige uno: se ejecuta al seleccionarlo.' },
+            footer: { text: 'Comandos con @usuario: !menu params' },
+            nativeFlowMessage: {
+              buttons: [{ name: 'single_select', buttonParamsJson }],
+            },
+          },
+        },
       },
-    }, {});
+    }, {
+      additionalNodes: [{
+        tag: 'biz',
+        attrs: {},
+        content: [{
+          tag: 'interactive',
+          attrs: { type: 'native_flow', v: '1' },
+          content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }],
+        }],
+      }],
+    });
   },
 };

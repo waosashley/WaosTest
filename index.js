@@ -165,6 +165,9 @@ async function startBot() {
     // Voto en una encuesta del menú: se ejecuta el comando de la opción elegida
     if (!commandText && msg.message.pollUpdateMessage) commandText = Polls.getVotedCommand(msg);
     if (!commandText && msg.message.listResponseMessage) commandText = msg.message.listResponseMessage.singleSelectReply?.selectedRowId || null;
+    if (!commandText && msg.message.interactiveResponseMessage) {
+      try { commandText = JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage?.paramsJson || '{}').id || null; } catch { commandText = null; }
+    }
 
     if (!commandText && (text.startsWith('!') || text.startsWith('.'))) commandText = text;
     if (!commandText) return;
