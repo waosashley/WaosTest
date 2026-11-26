@@ -13,21 +13,32 @@ module.exports = {
       if (!state) return reply({ text: 'No hay trivia activa.' });
       clearTimeout(state.timeout);
       U.pendingTrivia.delete(groupJid);
-      T.marcarFin(state.starter);
       return reply({ text: `🛑 Trivia cancelada. La respuesta era *${state.answer}*.` });
     }
 
     if (sub === 'rank' || sub === 'ranking' || sub === 'top') {
       const wins = U.triviaWins[groupJid] || {};
       const entries = Object.entries(wins).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      if (!entries.length) return reply({ text: 'Nadie ha ganado todavía.' });
+      const rachas = Object.entries(U.triviaStreak[groupJid] || {}).filter(([, r]) => r > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      if (!entries.length && !rachas.length) return reply({ text: 'Nadie ha ganado todavía.' });
       const medals = ['🥇', '🥈', '🥉'];
-      const lines = entries.map(([jid, w], i) =>
-        `${medals[i] || `${i + 1}.`} @${jid.split('@')[0]}: ${w} ${w === 1 ? 'victoria' : 'victorias'}`
-      );
+      const sections = [];
+      if (entries.length) {
+        const lines = entries.map(([jid, w], i) =>
+          `${medals[i] || `${i + 1}.`} @${jid.split('@')[0]}: ${w} ${w === 1 ? 'victoria' : 'victorias'}`
+        );
+        sections.push(`🏆 *Victorias*\n${lines.join('\n')}`);
+      }
+      if (rachas.length) {
+        const lines = rachas.map(([jid, r], i) =>
+          `${medals[i] || `${i + 1}.`} @${jid.split('@')[0]}: ${r} ${r === 1 ? 'acierto' : 'aciertos'} seguidos`
+        );
+        sections.push(`🔥 *Racha de aciertos*\n${lines.join('\n')}`);
+      }
+      const mentions = [...new Set([...entries, ...rachas].map(([j]) => j))];
       return reply({
-        text: `*Ranking Trivia Math*\n\n${lines.join('\n')}`,
-        mentions: entries.map(([j]) => j),
+        text: `*Ranking Trivia Math*\n\n${sections.join('\n\n')}`,
+        mentions,
       });
     }
 
