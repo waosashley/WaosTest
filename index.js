@@ -164,6 +164,7 @@ async function startBot() {
 
     // Voto en una encuesta del menú: se ejecuta el comando de la opción elegida
     if (!commandText && msg.message.pollUpdateMessage) commandText = Polls.getVotedCommand(msg);
+    if (!commandText && msg.message.listResponseMessage) commandText = msg.message.listResponseMessage.singleSelectReply?.selectedRowId || null;
 
     if (!commandText && (text.startsWith('!') || text.startsWith('.'))) commandText = text;
     if (!commandText) return;

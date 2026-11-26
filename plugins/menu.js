@@ -1,62 +1,79 @@
-const CATEGORIES = {
-  buscaminas: {
-    title: '🎲 Buscaminas y trivia',
-    options: [
-      { label: '🟢 Buscaminas fácil', cmd: '!buscaminas facil' },
-      { label: '🟡 Buscaminas medio', cmd: '!buscaminas medio' },
-      { label: '🔴 Buscaminas difícil', cmd: '!buscaminas dificil' },
-      { label: '👥 Buscaminas multijugador', cmd: '!buscaminas multi' },
-      { label: '✅ Buscaminas: unirme', cmd: '!buscaminas unirme' },
-      { label: '▶️ Buscaminas: iniciar', cmd: '!buscaminas iniciar' },
-      { label: '⛔ Cancelar buscaminas', cmd: '!buscaminas stop' },
-      { label: '🧮 Trivia matemática', cmd: '!triviamath' },
-      { label: '🏆 Ranking de trivia', cmd: '!triviamath rank' },
-      { label: '🛑 Cancelar trivia', cmd: '!triviamath stop' },
-    ],
-  },
-  ruleta: {
-    title: '🎮 Ruleta y Conecta 4',
-    options: [
-      { label: '🔫 Ruleta rusa: crear', cmd: '!ruletarusa create' },
-      { label: '✅ Ruleta rusa: unirme', cmd: '!ruletarusa unirme' },
-      { label: '▶️ Ruleta rusa: iniciar', cmd: '!ruletarusa iniciar' },
-      { label: '🛑 Ruleta rusa: cancelar', cmd: '!ruletarusa stop' },
-      { label: '🎭 Ruleta fake', cmd: '!ruletafake' },
-      { label: '🔴 Conecta 4: crear', cmd: '!conecta4' },
-      { label: '✅ Conecta 4: unirme', cmd: '!conecta4 unirme' },
-      { label: '▶️ Conecta 4: iniciar', cmd: '!conecta4 iniciar' },
-      { label: '🛑 Conecta 4: cancelar', cmd: '!conecta4 stop' },
-    ],
-  },
-  moderacion: {
-    title: '🛡️ Moderación y stickers',
-    options: [
-      { label: '🔒 Cerrar grupo', cmd: '!mute' },
-      { label: '🔓 Abrir grupo', cmd: '!unmute' },
-      { label: '🚫 Palabras prohibidas', cmd: '!listbanwords' },
-      { label: '🚫 Stickers baneados', cmd: '!stickersbans' },
-      { label: '🧷 Comandos de stickers', cmd: '!listcmd' },
-    ],
-  },
-};
-
-const PARAMS_TEXT = `*Comandos con parámetros*
-
-!kick @usuario — saca a alguien
-!warn @usuario — advertencia (3 y se va)
-!mute @usuario — silencia a alguien
-!unmute @usuario — desilencia
-!banword @usuario palabras — prohíbe palabras
-!unbanword @usuario — quita prohibiciones
-!bansticker (responder sticker) — prohíbe sticker
-!unbansticker (responder sticker) — lo quita
-!addcmd !comando (responder sticker) — registra sticker
-!delcmd (responder sticker) — elimina comando
-A1 e — excava la casilla A1 (durante una partida)
-A1 b — pone o quita bandera (durante una partida)
-A1e B2e C3b — varias jugadas en un mensaje
-!buscaminas multi facil — multijugador por turnos (2 a 4)
-!cooldown @usuario off — quita cooldown de buscaminas (solo dueña)`;
+// Cada fila: [comando que se ejecuta al elegirla, descripción]
+const SECTIONS = [
+  { title: '🎲 Buscaminas y trivia', rows: [
+    ['!buscaminas facil', 'Tablero 8x8, 10 minas'],
+    ['!buscaminas medio', 'Tablero 12x12, 24 minas'],
+    ['!buscaminas dificil', 'Tablero 16x16, 48 minas'],
+    ['!buscaminas multi', 'Multijugador por turnos (2 a 4)'],
+    ['!buscaminas unirme', 'Unirte a la partida multijugador'],
+    ['!buscaminas iniciar', 'Iniciar partida multijugador (creador)'],
+    ['!buscaminas stop', 'Cancelar buscaminas'],
+    ['!triviamath', 'Trivia de matemáticas'],
+    ['!triviamath rank', 'Ranking de trivia'],
+    ['!triviamath stop', 'Cancelar trivia'],
+  ] },
+  { title: '🎮 Ruleta y mesas', rows: [
+    ['!ruletarusa', 'Crear ruleta rusa'],
+    ['!ruletarusa unirme', 'Unirte a la ruleta rusa'],
+    ['!ruletarusa iniciar', 'Iniciar ruleta rusa'],
+    ['!ruletarusa stop', 'Cancelar ruleta rusa'],
+    ['!ruletafake', 'Ruleta fake'],
+    ['!conecta4', 'Crear Conecta 4'],
+    ['!conecta4 unirme', 'Unirte a Conecta 4'],
+    ['!conecta4 iniciar', 'Iniciar Conecta 4'],
+    ['!conecta4 stop', 'Cancelar Conecta 4'],
+    ['!battleship', 'Crear batalla naval'],
+  ] },
+  { title: '♟️ Otros juegos', rows: [
+    ['!ajedrez', 'Crear partida de ajedrez'],
+    ['!ajedrez unirme', 'Unirte al ajedrez'],
+    ['!ajedrez iniciar', 'Iniciar ajedrez'],
+    ['!ajedrez stop', 'Cancelar ajedrez'],
+    ['!battleship unirme', 'Unirte a batalla naval'],
+    ['!battleship iniciar', 'Iniciar batalla naval'],
+    ['!battleship stop', 'Cancelar batalla naval'],
+    ['!akinator', 'Adivina el personaje'],
+    ['!akinator stop', 'Cancelar akinator'],
+  ] },
+  { title: '🎵 Audio y video', rows: [
+    ['!playaudio', 'Descargar audio: !playaudio <canción o link>'],
+    ['!mp4', 'Descargar video: !mp4 <nombre o link>'],
+    ['!sa', 'Sticker con sonido (responde audio + foto/video/sticker)'],
+    ['!sav', 'Sticker con el audio de un video'],
+    ['!modvoice', 'Cambia la voz de un audio: aguda/grave 1-12'],
+  ] },
+  { title: '🛡️ Moderación', rows: [
+    ['!kick', 'Sacar del grupo: !kick @usuario'],
+    ['!warn', 'Advertencia (3 y se va): !warn @usuario'],
+    ['!mute', 'Cerrar grupo, o !mute @usuario'],
+    ['!unmute', 'Abrir grupo, o !unmute @usuario'],
+    ['!mutelist', 'Usuarios silenciados'],
+    ['!banword', 'Prohibir palabras: !banword @usuario palabras'],
+    ['!unbanword', 'Quitar prohibiciones: !unbanword @usuario'],
+    ['!banwordgroup', 'Prohibir palabra en el grupo: !banwordgroup <palabra>'],
+    ['!unbanwordgroup', 'Quitar palabra del grupo: !unbanwordgroup <palabra>'],
+    ['!listbanwords', 'Palabras prohibidas'],
+  ] },
+  { title: '🚫 Stickers y comandos', rows: [
+    ['!bansticker', 'Prohibir sticker (responder al sticker)'],
+    ['!unbansticker', 'Quitar ban de sticker (responder)'],
+    ['!stickersbans', 'Stickers baneados (se envían en privado)'],
+    ['!addcmd', 'Registrar sticker como comando: !addcmd !comando'],
+    ['!delcmd', 'Eliminar comando de sticker (responder)'],
+    ['!listcmd', 'Comandos de stickers'],
+    ['!blockcmd', 'Bloquear comando: !blockcmd !comando'],
+    ['!unblockcmd', 'Desbloquear comando: !unblockcmd !comando'],
+    ['!blockcmdlist', 'Comandos bloqueados'],
+  ] },
+  { title: '⚙️ Programar y utilidades', rows: [
+    ['!programar', 'Programar apertura/cierre del grupo'],
+    ['!delprogramar', 'Borrar programación: !delprogramar <número>'],
+    ['!cooldown', 'Quitar cooldown (solo dueña): !cooldown @usuario off'],
+    ['!ping', 'Ver si el bot responde'],
+    ['!menu params', 'Comandos con @usuario (texto)'],
+    ['!menu', 'Este menú'],
+  ] },
+];
 
 const MAIN_TITLE = '🤖 ASHP BOT · MENÚ';
 
@@ -65,19 +82,20 @@ module.exports = {
   aliases: ['help', 'comandos'],
   public: true,
   run: async ({ args, reply }) => {
-    const key = (args[0] || '').toLowerCase();
+    if ((args[0] || '').toLowerCase() === 'params') return reply({ text: PARAMS_TEXT });
 
-    if (key === 'params') return reply({ text: PARAMS_TEXT });
-
-    const category = CATEGORIES[key];
-    if (category) {
-      const lines = category.options.map(o => `${o.label}\n   ${o.cmd}`);
-      return reply({ text: `*${category.title}*\n\n${lines.join('\n')}\n\n_Escribe el comando para usarlo._` });
-    }
-
-    const cats = Object.entries(CATEGORIES).map(([id, c]) => `• ${c.title} → *!menu ${id}*`);
     return reply({
-      text: `*${MAIN_TITLE}*\n\n${cats.join('\n')}\n• 📋 Comandos con @usuario → *!menu params*`,
+      listMessage: {
+        title: MAIN_TITLE,
+        description: 'Toca *Ver comandos* y elige uno: se ejecuta al seleccionarlo.',
+        buttonText: '📋 Ver comandos',
+        footerText: 'Comandos con @usuario: !menu params',
+        listType: 1,
+        sections: SECTIONS.map(s => ({
+          title: s.title,
+          rows: s.rows.map(([cmd, desc]) => ({ title: cmd, description: desc, rowId: cmd })),
+        })),
+      },
     });
   },
 };
