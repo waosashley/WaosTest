@@ -5,8 +5,19 @@ module.exports = {
   name: 'triviamath',
   aliases: ['math', 'matetrivia', 'tm'],
   public: true,
-  run: async ({ sock, groupJid, senderJid, args, reply }) => {
+  run: async ({ sock, groupJid, senderJid, senderPn, args, reply }) => {
     const sub = args[0]?.toLowerCase();
+
+    if (sub === 'shield') {
+      if (!U.isBotOwner(senderJid, senderPn)) return reply({ text: '🔒 Solo la creadora del bot puede usar este comando.' });
+      const modo = args[1]?.toLowerCase();
+      if (modo !== 'on' && modo !== 'off') {
+        return reply({ text: `🛡️ Shield: ${U.triviaShield.on ? 'activado' : 'desactivado'}. Uso: !tm shield on/off` });
+      }
+      U.triviaShield.on = modo === 'on';
+      U.saveJSON('triviaShield.json', U.triviaShield);
+      return reply({ text: `🛡️ Shield ${U.triviaShield.on ? 'activado' : 'desactivado'}.` });
+    }
 
     if (sub === 'stop' || sub === 'cancelar') {
       const state = U.pendingTrivia.get(groupJid);
@@ -48,6 +59,6 @@ module.exports = {
     const restante = T.cooldownRestante(senderJid);
     if (restante > 0) return reply({ text: `⏳ Espera ${Math.ceil(restante / 1000)} s para lanzar otra trivia.` });
 
-    return T.startGame(sock, groupJid, senderJid);
+    return T.startGame(sock, groupJid, senderJid, U.isBotOwner(senderJid, senderPn));
   },
 };
